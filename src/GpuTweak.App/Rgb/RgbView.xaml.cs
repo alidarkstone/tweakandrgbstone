@@ -1,3 +1,5 @@
+// Ported from rgbstone, which was written without nullable annotations.
+#nullable disable
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -19,7 +21,8 @@ using FxEffect = RgbStone.Core.Effect;
 
 namespace RgbStone.UI
 {
-    public partial class MainWindow : Window
+    /// <summary>The RGB tab: rgbstone's window, now hosted inside the tweakandrgbstone main window.</summary>
+    public partial class RgbView : UserControl
     {
         sealed class NavEntry
         {
@@ -30,12 +33,11 @@ namespace RgbStone.UI
 
         readonly Engine _engine;
         readonly AppSettings _settings;
-        readonly WinForms.NotifyIcon _tray;
         readonly DispatcherTimer _refresh, _animation;
         readonly Stopwatch _clock = Stopwatch.StartNew();
         readonly List<(WriteableBitmap bmp, Func<FxEffect> effect)> _previews = new List<(WriteableBitmap, Func<FxEffect>)>();
         readonly List<Action> _pageRefreshers = new List<Action>();
-        bool _exiting, _scanning;
+        bool _scanning;
 
         static readonly Dictionary<DeviceKind, (string glyph, Color color)> KindIcons = new Dictionary<DeviceKind, (string, Color)>
         {
@@ -59,11 +61,11 @@ namespace RgbStone.UI
 
         readonly Web.WebDashboard _dashboard;
 
-        public MainWindow(Engine engine, AppSettings settings, Web.WebDashboard dashboard)
+        public RgbView(RgbHost host)
         {
-            _engine = engine;
-            _settings = settings;
-            _dashboard = dashboard;
+            _engine = host.Engine;
+            _settings = host.Settings;
+            _dashboard = host.Dashboard;
             // changes made from a phone show up in the open page
             _dashboard.SettingsChanged += () => Dispatcher.BeginInvoke((Action)(() =>
             {
@@ -73,15 +75,11 @@ namespace RgbStone.UI
 
             LogoImage.Source = LoadPng("logo-64.png");
             VersionText.Text = "Sürüm " + Assembly.GetExecutingAssembly().GetName().Version.ToString(3);
-            Icon = LoadIco();
 
             RescanButton.Click += (s, e) => Rescan();
             Nav.SelectionChanged += (s, e) => ShowSelected();
             BuildNav();
             Nav.SelectedIndex = 0;
-
-            _tray = new WinForms.NotifyIcon { Icon = LoadTrayIcon(), Text = "rgbstone", Visible = true, ContextMenuStrip = BuildTrayMenu() };
-            _tray.DoubleClick += (s, e) => ShowFromTray();
 
             _refresh = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1) };
             _refresh.Tick += (s, e) => RefreshStatus();
@@ -92,7 +90,8 @@ namespace RgbStone.UI
             _animation.Start();
 
             _engine.DevicesChanged += () => Dispatcher.BeginInvoke((Action)(() => { BuildNav(); _scanning = false; RescanButton.IsEnabled = true; RescanText.Text = "Cihazları yeniden tara"; }));
-            SourceInitialized += (s, e) => { DarkTitleBar(); HookDeviceChanges(); };
+            // hot-plug messages arrive at the main window; it exists (hidden) even when started in the tray
+            Loaded += (s, e) => HookDeviceChanges();
         }
 
         // ---------- hot-plug: a newly connected device is picked up without a manual rescan ----------
@@ -102,6 +101,9 @@ namespace RgbStone.UI
 
         void HookDeviceChanges()
         {
+            if (_plugDebounce != null) return; // Loaded fires again whenever the tab is shown
+            var window = Window.GetWindow(this);
+            if (window == null) return;
             _hidSignature = HidSignature();
             _plugDebounce = new DispatcherTimer { Interval = TimeSpan.FromSeconds(3) };
             _plugDebounce.Tick += (s, e) =>
@@ -113,7 +115,7 @@ namespace RgbStone.UI
                 Log.Info("Cihaz takıldı/çıkarıldı, yeniden taranıyor.");
                 Rescan();
             };
-            HwndSource.FromHwnd(new WindowInteropHelper(this).Handle)?.AddHook((IntPtr hwnd, int msg, IntPtr w, IntPtr l, ref bool handled) =>
+            HwndSource.FromHwnd(new WindowInteropHelper(window).EnsureHandle())?.AddHook((IntPtr hwnd, int msg, IntPtr w, IntPtr l, ref bool handled) =>
             {
                 const int WM_DEVICECHANGE = 0x0219, DBT_DEVNODES_CHANGED = 0x0007, DBT_DEVICEARRIVAL = 0x8000, DBT_DEVICEREMOVECOMPLETE = 0x8004;
                 if (msg != WM_DEVICECHANGE) return IntPtr.Zero;
@@ -137,20 +139,7 @@ namespace RgbStone.UI
             catch { return ""; }
         }
 
-        // ---------- window chrome / tray ----------
-
-        [DllImport("dwmapi.dll")] static extern int DwmSetWindowAttribute(IntPtr hwnd, int attr, ref int value, int size);
-
-        void DarkTitleBar()
-        {
-            var hwnd = new WindowInteropHelper(this).Handle;
-            int on = 1;
-            DwmSetWindowAttribute(hwnd, 20, ref on, 4);           // immersive dark mode
-            int caption = 0x001E1C1C;                              // COLORREF of #1C1C1E
-            DwmSetWindowAttribute(hwnd, 35, ref caption, 4);       // caption color (Windows 11)
-            int round = 2;
-            DwmSetWindowAttribute(hwnd, 33, ref round, 4);         // rounded corners
-        }
+        // ---------- assets / tray ----------
 
         static BitmapImage LoadPng(string name)
         {
@@ -161,68 +150,29 @@ namespace RgbStone.UI
             return img;
         }
 
-        static BitmapFrame LoadIco()
+        /// <summary>"Efekt" submenu for the shared notification-area icon.</summary>
+        public WinForms.ToolStripMenuItem BuildEffectMenu()
         {
-            var s = Assembly.GetExecutingAssembly().GetManifestResourceStream("rgbstone.ico");
-            return s == null ? null : BitmapFrame.Create(s, BitmapCreateOptions.None, BitmapCacheOption.OnLoad);
-        }
-
-        static System.Drawing.Icon LoadTrayIcon()
-        {
-            using (var s = Assembly.GetExecutingAssembly().GetManifestResourceStream("rgbstone.ico"))
-                return s != null ? new System.Drawing.Icon(s, WinForms.SystemInformation.SmallIconSize) : System.Drawing.SystemIcons.Application;
-        }
-
-        WinForms.ContextMenuStrip BuildTrayMenu()
-        {
-            var m = new WinForms.ContextMenuStrip();
-            m.Items.Add("rgbstone'u aç", null, (s, e) => ShowFromTray());
-            var fx = new WinForms.ToolStripMenuItem("Efekt");
+            var fx = new WinForms.ToolStripMenuItem("RGB efekti");
             foreach (var e in FxEffect.All)
             {
                 var item = new WinForms.ToolStripMenuItem(e.DisplayName) { Tag = e.Id };
                 item.Click += (s, a) => Dispatcher.Invoke(() => SetEffect((string)((WinForms.ToolStripMenuItem)s).Tag));
                 fx.DropDownItems.Add(item);
             }
-            m.Items.Add(fx);
-            m.Items.Add(new WinForms.ToolStripSeparator());
-            m.Items.Add("Çıkış", null, (s, e) => Dispatcher.Invoke(ExitApp));
-            m.Opening += (s, e) => { foreach (WinForms.ToolStripMenuItem i in fx.DropDownItems) i.Checked = (string)i.Tag == _settings.Effect; };
-            return m;
+            fx.DropDownOpening += (s, e) => { foreach (WinForms.ToolStripMenuItem i in fx.DropDownItems) i.Checked = (string)i.Tag == _settings.Effect; };
+            return fx;
         }
 
-        public void ShowFromTray()
+        /// <summary>Stops the timers when the app exits.</summary>
+        public void Shutdown()
         {
-            Dispatcher.Invoke(() =>
-            {
-                Show();
-                if (WindowState == WindowState.Minimized) WindowState = WindowState.Normal;
-                Activate();
-            });
-        }
-
-        public void ExitApp()
-        {
-            _exiting = true;
-            _tray.Visible = false;
-            _tray.Dispose();
-            Close();
-            Application.Current.Shutdown();
-        }
-
-        protected override void OnClosing(System.ComponentModel.CancelEventArgs e)
-        {
-            if (!_exiting)
-            {
-                e.Cancel = true;
-                Hide();
-                _tray.ShowBalloonTip(2000, "rgbstone", "Arka planda çalışmaya devam ediyor. Kapatmak için tepsi simgesine sağ tıkla.", WinForms.ToolTipIcon.None);
-                return;
-            }
             _refresh.Stop();
             _animation.Stop();
-            base.OnClosing(e);
+            _plugDebounce?.Stop();
         }
+
+        Window OwnerWindow => Window.GetWindow(this);
 
         // ---------- scanning ----------
 
@@ -443,7 +393,7 @@ namespace RgbStone.UI
             g.Children.Add(new TextBlock { Text = "", Style = Res<Style>("Icon"), Foreground = Res<Brush>("OrangeBrush"), FontSize = 16, VerticalAlignment = VerticalAlignment.Top, Margin = new Thickness(0, 1, 10, 0) });
             var t = new TextBlock { TextWrapping = TextWrapping.Wrap, TextTrimming = TextTrimming.None };
             t.Inlines.Add(new System.Windows.Documents.Run("Üretici yazılımları da çalışıyor. ") { FontWeight = FontWeights.SemiBold });
-            t.Inlines.Add(new System.Windows.Documents.Run(string.Join(", ", list) + ". rgbstone yine de kontrol eder; ışıklarda titreme olursa bu yazılımların aydınlatma özelliğini kapat.") { Foreground = Res<Brush>("SecondaryTextBrush") });
+            t.Inlines.Add(new System.Windows.Documents.Run(string.Join(", ", list) + ". Program yine de kontrol eder; ışıklarda titreme olursa bu yazılımların aydınlatma özelliğini kapat.") { Foreground = Res<Brush>("SecondaryTextBrush") });
             Grid.SetColumn(t, 1);
             g.Children.Add(t);
             return new Border { CornerRadius = new CornerRadius(12), Background = new SolidColorBrush(Color.FromArgb(0x26, 0xFF, 0x9F, 0x0A)), Child = g, Margin = new Thickness(0, 18, 0, 0) };
@@ -485,7 +435,7 @@ namespace RgbStone.UI
 
         // ---------- pages ----------
 
-        void SetEffect(string id)
+        public void SetEffect(string id)
         {
             _settings.Effect = id;
             _settings.Save();
@@ -578,7 +528,7 @@ namespace RgbStone.UI
             var sw = Switch(_settings.For(d.Id).Enabled, c => { _settings.For(d.Id).Enabled = c.IsChecked == true; _settings.Save(); });
             sw.IsEnabled = !unavailable;
             page.Children.Add(Card(
-                Row("Bu cihazı rgbstone yönetsin", sw, "Kapatırsan rgbstone bu cihaza hiçbir şey göndermez."),
+                Row("Bu cihazı program yönetsin", sw, "Kapatırsan program bu cihaza hiçbir şey göndermez."),
                 Row("Durum", status)));
 
             if (d.Zones.Count > 0)
@@ -640,26 +590,20 @@ namespace RgbStone.UI
             page.Children.Add(PageTitle("Ayarlar"));
 
             page.Children.Add(Section("Genel"));
-            var autostart = Switch(Autostart.IsEnabled(), c =>
-            {
-                bool ok = c.IsChecked == true ? Autostart.Enable(System.Windows.Forms.Application.ExecutablePath) : Autostart.Disable();
-                if (!ok) MessageBox.Show(this, "Windows başlangıç görevi değiştirilemedi. Ayrıntı rgbstone.log dosyasında.", "rgbstone");
-                c.IsChecked = Autostart.IsEnabled();
-            });
             page.Children.Add(Card(
-                Row("Windows ile başlat", autostart, "Oturum açınca arka planda, tepside başlar."),
                 Row("Üretici aydınlatma servislerini devral",
                     Switch(_settings.VendorTakeover, c => { _settings.VendorTakeover = c.IsChecked == true; _settings.Save(); Rescan(); }),
-                    "MSI Mystic Light servisleri rgbstone açıkken bir kez durdurulur, kapanınca geri başlatılır. Fan ve diğer özellikler etkilenmez."),
-                Row("Kapanış rengi", ColorSwatch(() => _settings.ShutdownColor, v => { _settings.ShutdownColor = v; _settings.Save(); }), "rgbstone kapanırken cihazlara verilen renk"),
+                    "MSI Mystic Light servisleri program açıkken bir kez durdurulur, kapanınca geri başlatılır. Fan ve diğer özellikler etkilenmez."),
+                Row("Kapanış rengi", ColorSwatch(() => _settings.ShutdownColor, v => { _settings.ShutdownColor = v; _settings.Save(); }), "Program kapanırken cihazlara verilen renk"),
                 SliderRow("Akıcılık", 10, 60, _settings.Fps, v => ((int)v) + " FPS", v => { _settings.Fps = (int)v; _settings.Save(); })));
+            page.Children.Add(Footnote("Windows ile başlatma GPU sekmesindeki Profillerim kartında. Açınca program oturum açılışında tepside başlar, RGB efekti ve GPU profili birlikte gelir."));
 
             page.Children.Add(Section("Bellek (RAM) ışıkları"));
             var ram = Switch(_settings.RamControl, c =>
             {
-                if (c.IsChecked == true && MessageBox.Show(this,
-                        "RAM ışıkları, bellek voltaj yongalarıyla aynı SMBus hattından kontrol edilir. Aynı anda başka bir program (SignalRGB, iCUE, HWiNFO vb.) bu hatta yazarsa bilgisayar kapanıp yeniden başlayabilir.\n\nrgbstone bu programlar açıkken RAM'e hiç yazmaz. Yine de açmak istiyor musun?",
-                        "rgbstone", MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes)
+                if (c.IsChecked == true && MessageBox.Show(OwnerWindow,
+                        "RAM ışıkları, bellek voltaj yongalarıyla aynı SMBus hattından kontrol edilir. Aynı anda başka bir program (SignalRGB, iCUE, HWiNFO vb.) bu hatta yazarsa bilgisayar kapanıp yeniden başlayabilir.\n\nBu programlar açıkken RGB tarafı RAM'e hiç yazmaz. Yine de açmak istiyor musun?",
+                        "tweakandrgbstone", MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes)
                 {
                     c.IsChecked = false;
                     return;
@@ -698,7 +642,7 @@ namespace RgbStone.UI
                 _settings.WebEnabled = on && ok;
                 _settings.Save();
                 c.IsChecked = _dashboard.Running;
-                if (on && !ok) MessageBox.Show(this, "Web panosu başlatılamadı. Ayrıntı rgbstone.log dosyasında.", "rgbstone");
+                if (on && !ok) MessageBox.Show(OwnerWindow, "Web panosu başlatılamadı. Ayrıntı rgbstone.log dosyasında.", "tweakandrgbstone");
                 fillWebInfo();
             });
             fillWebInfo();
@@ -720,7 +664,7 @@ namespace RgbStone.UI
                     return (FrameworkElement)Row($"{u.Brand} · {u.Product}", copy, "Kimlik " + u.Id);
                 }).ToArray();
                 page.Children.Add(Card(rows));
-                page.Children.Add(Footnote("Bu cihazlar RGB üreten markalardan ama henüz sürücüsü yok (bazılarının ışığı da olmayabilir). Kimliği gönderirsen sürücü eklenebilir; rgbstone o zamana kadar bu cihazlara dokunmaz."));
+                page.Children.Add(Footnote("Bu cihazlar RGB üreten markalardan ama henüz sürücüsü yok (bazılarının ışığı da olmayabilir). Kimliği gönderirsen sürücü eklenebilir; program o zamana kadar bu cihazlara dokunmaz."));
             }
 
             page.Children.Add(Section("Hakkında"));
@@ -742,7 +686,6 @@ namespace RgbStone.UI
                 if (it.Tag is NavEntry e && e.Device != null && e.Status != null && e.Status.Text != e.Device.Status)
                     e.Status.Text = e.Device.Status;
             foreach (var r in _pageRefreshers) r();
-            _tray.Text = $"rgbstone · {_engine.Devices.Count} cihaz · {_engine.MeasuredFps:0} FPS";
         }
     }
 }

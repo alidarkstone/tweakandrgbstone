@@ -1,7 +1,0 @@
-build/
-.tools/
-dist/rgbstone.json
-dist/rgbstone.log*
-*.user
-bin/
-obj/

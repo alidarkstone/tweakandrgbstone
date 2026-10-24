@@ -6,11 +6,11 @@
     <!-- Only for the notification-area icon (NotifyIcon); WPF has none. -->
     <UseWindowsForms>true</UseWindowsForms>
     <EnableWindowsTargeting>true</EnableWindowsTargeting>
-    <AssemblyName>Tweakstone</AssemblyName>
+    <AssemblyName>tweakandrgbstone</AssemblyName>
     <RootNamespace>GpuTweak.App</RootNamespace>
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <ApplicationIcon>Assets\app.ico</ApplicationIcon>
-    <Product>Tweakstone</Product>
+    <Product>tweakandrgbstone</Product>
 
     <!-- Portable single exe -->
     <RuntimeIdentifier>win-x64</RuntimeIdentifier>
@@ -28,9 +28,13 @@
   </ItemGroup>
   <ItemGroup>
     <Resource Include="Assets\app.ico" />
+    <!-- Read by the RGB tab through GetManifestResourceStream, as in rgbstone. -->
+    <EmbeddedResource Include="Assets\rgbstone\logo-64.png" LogicalName="logo-64.png" />
+    <None Remove="Assets\rgbstone\**" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\GpuTweak.Core\GpuTweak.Core.csproj" />
+    <ProjectReference Include="..\RgbStone.Core\RgbStone.Core.csproj" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="Microsoft.Diagnostics.Tracing.TraceEvent" Version="3.1.13" />

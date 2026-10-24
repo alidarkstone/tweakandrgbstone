@@ -44,6 +44,13 @@ namespace RgbStone.Core
         public static string Folder { get; private set; }
         static string FilePath => Path.Combine(Folder, "rgbstone.json");
 
+        /// <summary>Used by tweakandrgbstone: rgbstone.json and rgbstone.log live in the shared data folder.</summary>
+        public static void UseFolder(string folder)
+        {
+            Directory.CreateDirectory(folder);
+            Folder = folder;
+        }
+
         /// <summary>Portable: settings live next to the exe; falls back to %APPDATA%\rgbstone when that folder is read-only.</summary>
         public static void ResolveFolder()
         {

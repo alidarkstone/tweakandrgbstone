@@ -10,7 +10,7 @@ using System.Reflection;
 using System.Security.Cryptography;
 using System.Text;
 using System.Threading;
-using System.Web.Script.Serialization;
+using System.Text.Json;
 using RgbStone.Core;
 
 namespace RgbStone.Web
@@ -27,7 +27,6 @@ namespace RgbStone.Web
 
         readonly Engine _engine;
         readonly AppSettings _settings;
-        readonly JavaScriptSerializer _json = new JavaScriptSerializer();
         readonly HashSet<string> _tokens = new HashSet<string>();
         readonly Stopwatch _clock = Stopwatch.StartNew();
         HttpListener _listener;
@@ -253,12 +252,31 @@ namespace RgbStone.Web
             using (var r = new StreamReader(req.InputStream, Encoding.UTF8))
             {
                 string body = r.ReadToEnd();
-                try { return _json.Deserialize<Dictionary<string, object>>(body) ?? new Dictionary<string, object>(); }
+                try
+                {
+                    using (var doc = JsonDocument.Parse(body))
+                    {
+                        var result = new Dictionary<string, object>();
+                        if (doc.RootElement.ValueKind != JsonValueKind.Object) return result;
+                        // Plain CLR values, so the Convert.ToX calls below work as they did with JavaScriptSerializer.
+                        foreach (var p in doc.RootElement.EnumerateObject())
+                            result[p.Name] = p.Value.ValueKind switch
+                            {
+                                JsonValueKind.String => p.Value.GetString(),
+                                JsonValueKind.Number => p.Value.GetDouble(),
+                                JsonValueKind.True => true,
+                                JsonValueKind.False => false,
+                                JsonValueKind.Null => null,
+                                _ => p.Value.GetRawText(),
+                            };
+                        return result;
+                    }
+                }
                 catch { return new Dictionary<string, object>(); }
             }
         }
 
-        void Json(HttpListenerContext ctx, object o) => Send(ctx, 200, "application/json; charset=utf-8", _json.Serialize(o));
+        void Json(HttpListenerContext ctx, object o) => Send(ctx, 200, "application/json; charset=utf-8", JsonSerializer.Serialize(o));
 
         static void Send(HttpListenerContext ctx, int code, string type, string text) => SendBytes(ctx, code, type, Encoding.UTF8.GetBytes(text));
 

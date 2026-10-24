@@ -1,10 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <assembly manifestVersion="1.0" xmlns="urn:schemas-microsoft-com:asm.v1">
-  <assemblyIdentity version="1.0.0.0" name="GpuTweak.app"/>
+  <assemblyIdentity version="1.0.0.0" name="tweakandrgbstone.app"/>
   <trustInfo xmlns="urn:schemas-microsoft-com:asm.v2">
     <security>
       <requestedPrivileges xmlns="urn:schemas-microsoft-com:asm.v3">
-        <!-- NVML needs admin rights to change clocks, power and fans. -->
+        <!-- NVML needs admin rights to change clocks, power and fans; RAM lighting (SMBus) needs them too. -->
         <requestedExecutionLevel level="requireAdministrator" uiAccess="false" />
       </requestedPrivileges>
     </security>

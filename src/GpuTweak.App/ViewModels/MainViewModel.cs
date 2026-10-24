@@ -135,7 +135,7 @@ public sealed class MainViewModel : ObservableObject, IDisposable
     public TuningLimits Limits { get; }
     public OverlayViewModel Overlay { get; }
     public string VendorName => Info.Vendor switch { GpuVendor.Nvidia => "NVIDIA", GpuVendor.Amd => "AMD", GpuVendor.Intel => "Intel", _ => "GPU" };
-    public string Subtitle => L.F("Sürücü {0} · {1:0} GB VRAM · Tweakstone v{2}", Info.DriverVersion, Info.VramBytes / (1024 * 1024 * 1024.0), AppVersion);
+    public string Subtitle => L.F("Sürücü {0} · {1:0} GB VRAM · tweakandrgbstone v{2}", Info.DriverVersion, Info.VramBytes / (1024 * 1024 * 1024.0), AppVersion);
     private static string AppVersion => typeof(MainViewModel).Assembly.GetName().Version?.ToString(3) ?? "?";
     public bool IsCustomActive => !_active.IsStock;
     public string ActiveStateText => _active.IsStock ? L.T("Varsayılan ayarlar") : _activeProfileName is { } n ? L.F("Aktif: {0}", n) : L.T("Özel ayarlar aktif");
@@ -897,13 +897,13 @@ public sealed class MainViewModel : ObservableObject, IDisposable
         }
     }
 
-    private string _trayText = "Tweakstone";
-    /// <summary>Hover text of the notification-area icon, e.g. "Tweakstone · 57°C · 133 W · Profil: Otomatik UV".</summary>
+    private string _trayText = "tweakandrgbstone";
+    /// <summary>Hover text of the notification-area icon, e.g. "tweakandrgbstone · 57°C · 133 W · Profil: Otomatik UV".</summary>
     public string TrayText { get => _trayText; private set => Set(ref _trayText, value); }
 
     private string TrayLine(GpuTelemetry s)
     {
-        var parts = new List<string> { "Tweakstone" };
+        var parts = new List<string> { "tweakandrgbstone" };
         if (s.TemperatureC is { } t) parts.Add($"{t:0}°C");
         if (s.PowerW is { } w) parts.Add($"{w:0} W");
         if (_activeProfileName is { } name) parts.Add(L.F("Profil: {0}", name));

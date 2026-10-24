@@ -4,6 +4,7 @@ using System.Windows.Input;
 using System.Windows.Media;
 using GpuTweak.App.Native;
 using GpuTweak.App.ViewModels;
+using RgbStone.UI;
 
 namespace GpuTweak.App.Views;
 
@@ -13,18 +14,21 @@ public partial class MainWindow : Window
     private readonly OverlayWindow _overlay;
     private GlobalHotKey? _hotKey, _artifactHotKey;
     private readonly TrayIcon _tray;
+    private readonly RgbView _rgb;
     private bool _exiting;
 
     // Layout design size (see the Viewbox in MainWindow.xaml); used to open the window with the right proportions.
     private const double DesignWidth = 1400, DesignHeight = 1480;
 
-    public MainWindow(MainViewModel viewModel)
+    public MainWindow(MainViewModel viewModel, RgbView rgb)
     {
         InitializeComponent();
         _viewModel = viewModel;
         DataContext = viewModel;
+        _rgb = rgb;
+        RgbPage.Content = rgb;
         _overlay = new OverlayWindow(viewModel.Overlay);
-        _tray = new TrayIcon(ShowFromTray, ExitApp);
+        _tray = new TrayIcon(ShowFromTray, ExitApp, rgb.BuildEffectMenu());
         viewModel.PropertyChanged += (_, e) =>
         {
             if (e.PropertyName == nameof(MainViewModel.TrayText)) _tray.SetText(viewModel.TrayText);
@@ -59,6 +63,7 @@ public partial class MainWindow : Window
         };
         Closed += (_, _) =>
         {
+            _rgb.Shutdown();
             _tray.Dispose();
             _hotKey?.Dispose();
             _artifactHotKey?.Dispose();
@@ -102,6 +107,15 @@ public partial class MainWindow : Window
         var scale = Math.Min(1.0, Math.Min(area.Width * 0.9 / DesignWidth, area.Height * 0.9 / DesignHeight));
         Width = DesignWidth * scale;
         Height = DesignHeight * scale;
+    }
+
+    /// <summary>GPU / RGB switch at the top of the window.</summary>
+    private void OnTabChecked(object sender, RoutedEventArgs e)
+    {
+        if (GpuPage is null || RgbPage is null) return; // fires while the XAML is still loading
+        var rgb = RgbTab.IsChecked == true;
+        GpuPage.Visibility = rgb ? Visibility.Collapsed : Visibility.Visible;
+        RgbPage.Visibility = rgb ? Visibility.Visible : Visibility.Collapsed;
     }
 
     private void OnCornerChecked(object sender, RoutedEventArgs e)

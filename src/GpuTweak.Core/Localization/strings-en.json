@@ -1,7 +1,7 @@
 {
  "Desteklenen bir NVIDIA ekran kartı bulunamadı (NVML yüklenemedi).\n\n": "No supported NVIDIA graphics card was found (NVML could not be loaded).\n\n",
  "AMD desteği bir sonraki sürümde geliyor. Arayüzü denemek için demo modunda açılsın mı?": "AMD support is coming in a later version. Open in demo mode to try the interface?",
- "Tweakstone – beklenmeyen hata": "Tweakstone – unexpected error",
+ "tweakandrgbstone – beklenmeyen hata": "tweakandrgbstone – unexpected error",
  "stok ayarlarda iki ölçüm farklı çıktı": "two runs at stock settings gave different results",
  "{0:N0} hesap hatası": "{0:N0} calculation errors",
  "sürücü sıfırlandı (0x{0:X8})": "driver was reset (0x{0:X8})",
@@ -10,7 +10,7 @@
  "Önceki otomatik ayar testi yarıda kaldı. Kaldığı yerden devam edebilirsin.": "The previous auto-tune test did not finish. You can resume where it stopped.",
  "Önceki oturum özel ayarlar açıkken beklenmedik şekilde kapandı. Güvenlik için varsayılan ayarlarla başlatıldı.": "The last session closed unexpectedly while custom settings were on. Started with default settings for safety.",
  "Stabil profil \"{0}\" otomatik uygulandı.": "Stable profile \"{0}\" applied automatically.",
- "Sürücü {0} · {1:0} GB VRAM · Tweakstone v{2}": "Driver {0} · {1:0} GB VRAM · Tweakstone v{2}",
+ "Sürücü {0} · {1:0} GB VRAM · tweakandrgbstone v{2}": "Driver {0} · {1:0} GB VRAM · tweakandrgbstone v{2}",
  "Varsayılan ayarlar": "Default settings",
  "Aktif: {0}": "Active: {0}",
  "Özel ayarlar aktif": "Custom settings active",
@@ -269,5 +269,8 @@
  "Sorun ayarlardan kaynaklanmadıysa (başka bir program, elektrik kesintisi) son düzeltmeyi geri alabilirsin.": "If the problem was not caused by the settings (another program, a power cut), you can undo the last correction.",
  "Son düzeltmeyi geri al": "Undo last correction",
  "Bu sorun artık ayarlara sayılmayacak. Ayarların değiştirilmedi.": "This problem will no longer count against the settings. Your settings were not changed.",
- "Tıkla, değeri yaz ve Enter'a bas": "Click, type the value and press Enter"
+ "Tıkla, değeri yaz ve Enter'a bas": "Click, type the value and press Enter",
+ "tweakandrgbstone zaten çalışıyor (saatin yanındaki simgelerde).": "tweakandrgbstone is already running (in the icons next to the clock).",
+ "Eski program açık: {0}.\n\nİkisi aynı anda ekran kartını ve RGB cihazlarını kontrol etmeye çalışır. Önce eski programı saatin yanındaki simgesine sağ tıklayıp Çıkış ile kapat, sonra tweakandrgbstone'u yeniden aç.": "An old app is running: {0}.\n\nBoth would try to control the graphics card and the RGB devices at the same time. First close the old app (right-click its icon next to the clock, then Exit), then open tweakandrgbstone again.",
+ "Eski programlar hâlâ Windows ile başlıyor: {0}.\n\ntweakandrgbstone ile aynı anda açılırlarsa ekran kartı ve RGB ayarları çakışır. Eski programların Windows ile başlaması kapatılsın mı?\n\n(Eski programlar ve ayarları silinmez.)": "The old apps still start with Windows: {0}.\n\nIf they run together with tweakandrgbstone, the graphics card and RGB settings will conflict. Stop the old apps from starting with Windows?\n\n(The old apps and their settings are not deleted.)"
 }
