@@ -177,9 +177,10 @@ namespace RgbStone.Transport
 
         static byte[] Pad(byte[] data, int len)
         {
-            if (data.Length >= len) return data;
+            if (data.Length == len || len <= 0) return data;
+            // Windows only accepts the exact report size: pad short packets, cut the zero tail of long ones.
             var b = new byte[len];
-            Array.Copy(data, b, data.Length);
+            Array.Copy(data, b, Math.Min(len, data.Length));
             return b;
         }
 

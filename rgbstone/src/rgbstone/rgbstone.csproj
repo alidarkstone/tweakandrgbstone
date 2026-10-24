@@ -15,7 +15,7 @@
     <AssemblyName>rgbstone</AssemblyName>
     <ApplicationIcon>..\..\assets\rgbstone.ico</ApplicationIcon>
     <ApplicationManifest>app.manifest</ApplicationManifest>
-    <Version>0.2.1</Version>
+    <Version>0.4.0</Version>
     <Product>rgbstone</Product>
     <Company>darkstone</Company>
     <Copyright>darkstone</Copyright>
