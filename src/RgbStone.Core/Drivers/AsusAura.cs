@@ -7,13 +7,14 @@ using RgbStone.Transport;
 namespace RgbStone.Drivers
 {
     /// <summary>
-    /// ASUS Aura USB motherboard controllers (0B05:18F3/19AF/1939/1BED/1AA6): onboard LEDs, 12V headers and addressable headers.
-    /// Not tested on real hardware yet, so devices report themselves as experimental.
+    /// ASUS Aura USB motherboard controllers (0B05:18F3/19AF/1939/1BED/1AA6) and the separate addressable-header
+    /// controllers on older boards (1867/1872/18A3/18A5), which speak the same 0xEC protocol and report their channels in the
+    /// same config table. Not tested on real hardware yet, so devices report themselves as experimental.
     /// </summary>
     public sealed class AsusAuraProvider : IDeviceProvider
     {
         public string Name => "ASUS Aura anakart";
-        static readonly ushort[] Pids = { 0x18F3, 0x19AF, 0x1939, 0x1BED, 0x1AA6 };
+        static readonly ushort[] Pids = { 0x18F3, 0x19AF, 0x1939, 0x1BED, 0x1AA6, 0x1867, 0x1872, 0x18A3, 0x18A5 };
 
         public IEnumerable<RgbDevice> Detect(DetectContext ctx)
         {

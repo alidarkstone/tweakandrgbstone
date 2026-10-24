@@ -30,17 +30,44 @@ namespace RgbStone.Drivers
                 }
                 if (dev != null) yield return dev;
             }
-            ProbeLegacy(ctx);
+            foreach (var dev in DetectLegacy(ctx)) yield return dev;
         }
 
-        /// <summary>
-        /// Older boards (VID 0x1462, PID = board number, e.g. 7D77) use the 185/162-byte protocol, which has no driver yet.
-        /// Read-only: logs the report sizes and the current zone config (feature report 0x52) so a driver can be written
-        /// against real data. Nothing is written to the board.
-        /// </summary>
         // Legacy 0x52 config, as read from a PRO B650M-A (1462:7D77): report id, then 10-byte zones (effect, RGB, flags,
         // RGB2, flags, pad); JRAINBOW1/2 are 11 bytes (plus LED count) at offsets 31 and 42.
-        static readonly int[] LegacyRainbowOffsets = { 31, 42 };
+        internal static readonly int[] LegacyRainbowOffsets = { 31, 42 };
+
+        /// <summary>Legacy board checked on real hardware (static color per ARGB header confirmed).</summary>
+        const ushort LegacyVerified = 0x7D77;
+
+        /// <summary>Board ids that OpenRGB lists as safe for the 0x52 protocol (its bricking-risk list is left out).</summary>
+        static readonly ushort[] LegacyPids =
+        {
+            0x1720, 0x7B12, 0x7B16, 0x7B17, 0x7B18, 0x7B50, 0x7B85, 0x7B92, 0x7B93, 0x7C02, 0x7C34, 0x7C35, 0x7C36, 0x7C37, 0x7C56, 0x7C59,
+            0x7C60, 0x7C67, 0x7C71, 0x7C73, 0x7C75, 0x7C76, 0x7C77, 0x7C79, 0x7C80, 0x7C81, 0x7C82, 0x7C83, 0x7C84, 0x7C86, 0x7C87, 0x7C90,
+            0x7C91, 0x7C92, 0x7C94, 0x7C95, 0x7C98, 0x7D03, 0x7D04, 0x7D06, 0x7D07, 0x7D08, 0x7D09, 0x7D13, 0x7D14, 0x7D15, 0x7D17, 0x7D18,
+            0x7D19, 0x7D20, 0x7D25, 0x7D27, 0x7D28, 0x7D29, 0x7D30, 0x7D31, 0x7D32, 0x7D33, 0x7D36, 0x7D37, 0x7D38, 0x7D40, 0x7D41, 0x7D42,
+            0x7D43, 0x7D46, 0x7D50, 0x7D51, 0x7D52, 0x7D53, 0x7D54, 0x7D59, 0x7D67, 0x7D69, 0x7D70, 0x7D73, 0x7D74, 0x7D75, 0x7D76, 0x7D77,
+            0x7D78, 0x7D86, 0x7D88, 0x7D89, 0x7D90, 0x7D91, 0x7D93, 0x7D96, 0x7D97, 0x7D98, 0x7D99, 0x7E01, 0x7E03, 0x7E06, 0x7E07, 0x7E09,
+            0x7E10, 0x7E20, 0x7E30, 0x7E32, 0x7E34, 0x7E59, 0x7E66, 0x7E70, 0x7E76, 0x7E80, 0x7E81, 0x7E86, 0xB926,
+        };
+
+        /// <summary>
+        /// Where each header's zone record sits in the 0x52 report, per report size (layouts from OpenRGB's packet structs).
+        /// Each entry: (display name, offset). Every record starts with effect, RGB, flags, RGB2.
+        /// </summary>
+        internal static (string name, int offset)[] LegacyLayout(int size)
+        {
+            if (size == 162)
+                return new[] { ("ARGB Header 1", 11), ("12V RGB 1", 1), ("12V RGB 2", 151), ("Kart üstü", 41) };
+            if (size == 112)
+                return new[] { ("ARGB Header 1", 11), ("12V RGB 1", 1), ("Kart üstü", 41) };
+            return new[] { ("ARGB Header 1", 31), ("ARGB Header 2", 42), ("12V RGB 1", 1), ("12V RGB 2", 174), ("Kart üstü", 74) };
+        }
+
+        /// <summary>Windows reports the declared feature size; the 761-byte ones (e.g. 7D77) carry the 185-byte layout.</summary>
+        static int LegacySize(int featureLength) =>
+            featureLength == 162 || featureLength == 163 ? 162 : featureLength == 112 || featureLength == 113 ? 112 : 185;
 
         /// <summary>
         /// One-off test for boards without a driver ("rgbstone.exe --msi-test"): reads the board's own 0x52 config, sets the two
@@ -80,22 +107,36 @@ namespace RgbStone.Drivers
             }
         }
 
-        static void ProbeLegacy(DetectContext ctx)
+        /// <summary>
+        /// Older boards (VID 0x1462, PID = board number) use the 0x52 zone-config protocol. Verified boards get a driver;
+        /// for any other one the report sizes and current config are only read and logged, so a driver can be written
+        /// against real data.
+        /// </summary>
+        static IEnumerable<RgbDevice> DetectLegacy(DetectContext ctx)
         {
-            foreach (var info in ctx.HidDevices.Where(d => d.VendorId == 0x1462))
+            var found = new List<RgbDevice>();
+            foreach (var info in ctx.HidDevices.Where(d => d.VendorId == 0x1462 && d.FeatureLength >= 112))
             {
+                HidDevice hid = null;
                 try
                 {
-                    Log.Info($"MSI eski kontrolcü 1462:{info.ProductId:X4} usage {info.UsagePage:X4}/{info.Usage:X4}: feature {info.FeatureLength}, input {info.InputLength}, output {info.OutputLength} bayt (henüz sürücü yok, sadece okundu)");
-                    if (info.FeatureLength <= 0) continue;
-                    using (var hid = HidDevice.Open(info))
+                    hid = HidDevice.Open(info);
+                    var cfg = hid.GetFeature(0x52);
+                    int size = LegacySize(info.FeatureLength);
+                    bool layoutOk = cfg != null && cfg.Length >= size && cfg[0] == 0x52;
+                    if (layoutOk && LegacyPids.Contains(info.ProductId))
                     {
-                        var cfg = hid.GetFeature(0x52);
-                        Log.Info(cfg == null ? "MSI eski kontrolcü: 0x52 okunamadı." : "MSI eski kontrolcü 0x52: " + BitConverter.ToString(cfg));
+                        found.Add(new MsiMysticLightLegacy(hid, ctx.System.BoardProduct, size, info.ProductId == LegacyVerified));
+                        hid = null; // owned by the device now
+                        continue;
                     }
+                    Log.Info($"MSI eski kontrolcü 1462:{info.ProductId:X4}: feature {info.FeatureLength} bayt, henüz sürücü yok (sadece okundu). 0x52: "
+                        + (cfg == null ? "okunamadı" : BitConverter.ToString(cfg, 0, Math.Min(cfg.Length, 185))));
                 }
                 catch (Exception ex) { Log.Error("MSI eski kontrolcü", ex); }
+                finally { hid?.Dispose(); }
             }
+            return found;
         }
     }
 
@@ -239,6 +280,71 @@ namespace RgbStone.Drivers
             if (!_hid.SetFeature(p)) { Status = "Yazma hatası"; return; }
             _hid.GetFeature(0x51); // the board expects the reply to be read back before the next packet
             Status = "Doğrudan kontrol";
+        }
+
+        public override void Dispose() => _hid.Dispose();
+    }
+
+    /// <summary>
+    /// Older MSI boards (0x52 zone config, e.g. PRO B650M-A). The ARGB headers take one static color each, not per-LED colors,
+    /// so each header is a single-LED zone. Only the effect and color bytes of those headers are changed; the rest of the
+    /// board's own config is written back as read, and nothing is saved to flash.
+    /// </summary>
+    public sealed class MsiMysticLightLegacy : RgbDevice
+    {
+        readonly HidDevice _hid;
+        readonly int _size;
+        readonly int[] _offsets;
+        readonly string _ok;
+        byte[] _base;
+        Rgb[] _last;
+
+        public override string[] ConflictingProcesses => new[] { "MSI_Central_Service", "Mystic_Light_Service", "LEDKeeper2", "LightKeeperService", "MSI.CentralServer", "MSI Center", "DCv2" };
+
+        internal MsiMysticLightLegacy(HidDevice hid, string board, int size, bool verified)
+        {
+            _hid = hid;
+            _size = size;
+            Id = HidSelect.Id(hid.Info);
+            Name = "MSI " + board;
+            Vendor = "MSI";
+            Kind = DeviceKind.Motherboard;
+            MaxFps = 10; // a whole config report per change; the board does not need more for fans
+            var layout = MsiMysticLightProvider.LegacyLayout(size);
+            _offsets = layout.Select(l => l.offset).ToArray();
+            foreach (var l in layout) Zones.Add(new RgbZone(l.name, 1));
+            _ok = "Doğrudan kontrol (başlık başına tek renk)" + (verified ? "" : " · deneysel");
+            Log.Info($"MSI eski protokol {hid.Info.ProductId:X4}: {size} bayt düzen" + (verified ? "" : " (bu kartta denenmedi)"));
+        }
+
+        public override void Initialize()
+        {
+            // Read again here: MSI's service may have changed the config since detection.
+            var cfg = _hid.GetFeature(0x52);
+            if (cfg != null && cfg.Length >= _size && cfg[0] == 0x52) _base = cfg;
+            if (_base == null) { Status = "Ayar okunamadı"; return; }
+            _base[_size - 1] = 0; // save flag: never write the config to flash
+            _last = null;
+            Status = _ok;
+        }
+
+        public override void Apply()
+        {
+            if (_base == null) return;
+            var colors = Zones.Select(z => z.Colors[0]).ToArray();
+            if (_last != null && colors.SequenceEqual(_last)) return;
+
+            var p = (byte[])_base.Clone();
+            for (int i = 0; i < colors.Length; i++)
+            {
+                int o = _offsets[i];
+                var c = colors[i];
+                p[o] = 0x01; // static
+                p[o + 1] = c.R; p[o + 2] = c.G; p[o + 3] = c.B;
+                p[o + 5] = c.R; p[o + 6] = c.G; p[o + 7] = c.B;
+            }
+            if (_hid.SetFeature(p)) { _last = colors; Status = _ok; }
+            else Status = "Yazma hatası";
         }
 
         public override void Dispose() => _hid.Dispose();
