@@ -1,0 +1,164 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#1c1c1e">
+<title>rgbstone</title>
+<link rel="icon" href="/icon.png">
+<link rel="apple-touch-icon" href="/icon.png">
+<style>
+  :root {
+    --bg: #1c1c1e; --card: #2c2c2e; --card2: #3a3a3c; --sep: #3a3a3c;
+    --text: #f5f5f7; --text2: #98989d; --accent: #0a84ff; --green: #30d158; --orange: #ff9f0a;
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  body { margin: 0; background: var(--bg); color: var(--text);
+         font: 15px/1.4 -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI Variable Text", "Segoe UI", sans-serif; }
+  main { max-width: 760px; margin: 0 auto; padding: max(24px, env(safe-area-inset-top)) 16px 48px; }
+  header { display: flex; align-items: center; gap: 12px; margin-bottom: 4px; }
+  header img { width: 40px; height: 40px; }
+  h1 { font-size: 30px; font-weight: 700; margin: 0; letter-spacing: -0.02em; }
+  .sub { color: var(--text2); margin: 0 0 18px; }
+  h2 { font-size: 13px; font-weight: 600; color: var(--text2); text-transform: none; margin: 26px 14px 8px; }
+  .card { background: var(--card); border-radius: 12px; overflow: hidden; }
+  .row { display: flex; align-items: center; gap: 12px; min-height: 48px; padding: 10px 16px; }
+  .row + .row { border-top: 1px solid var(--sep); margin-left: 16px; padding-left: 0; }
+  .row .grow { flex: 1; min-width: 0; }
+  .row .detail { color: var(--text2); font-size: 13px; }
+  .preview { height: 72px; border-radius: 12px; background: #000; display: flex; overflow: hidden; }
+  .preview span { flex: 1; }
+  .tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; }
+  .tile { background: var(--card); border-radius: 12px; padding: 10px; border: 2px solid transparent; cursor: pointer; text-align: left; color: var(--text); font: inherit; }
+  .tile.on { border-color: var(--accent); }
+  .tile .bar { height: 26px; border-radius: 7px; margin-bottom: 8px; }
+  input[type=range] { -webkit-appearance: none; appearance: none; width: 100%; height: 4px; border-radius: 2px; background: var(--card2); outline: none; }
+  input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 22px; height: 22px; border-radius: 50%; background: #fff; box-shadow: 0 1px 4px rgba(0,0,0,.4); }
+  input[type=range]::-moz-range-thumb { width: 22px; height: 22px; border-radius: 50%; background: #fff; border: 0; }
+  .val { color: var(--text2); width: 52px; text-align: right; font-variant-numeric: tabular-nums; }
+  .swatch { width: 30px; height: 30px; border-radius: 50%; border: 1px solid rgba(255,255,255,.4); padding: 0; overflow: hidden; }
+  .swatch input { opacity: 0; width: 100%; height: 100%; cursor: pointer; }
+  .switch { position: relative; width: 51px; height: 31px; flex: none; }
+  .switch input { display: none; }
+  .switch span { position: absolute; inset: 0; background: var(--card2); border-radius: 16px; transition: .2s; }
+  .switch span::after { content: ""; position: absolute; top: 2px; left: 2px; width: 27px; height: 27px; border-radius: 50%; background: #fff; transition: .2s; box-shadow: 0 1px 3px rgba(0,0,0,.4); }
+  .switch input:checked + span { background: var(--green); }
+  .switch input:checked + span::after { transform: translateX(20px); }
+  .icon { width: 30px; height: 30px; border-radius: 8px; display: grid; place-items: center; flex: none; font-size: 15px; }
+  .login { max-width: 340px; margin: 18vh auto 0; text-align: center; }
+  .login input { width: 100%; font-size: 28px; letter-spacing: .5em; text-align: center; padding: 12px; border-radius: 12px; border: 0;
+                 background: var(--card); color: var(--text); margin: 18px 0 12px; }
+  .btn { background: var(--accent); color: #fff; border: 0; border-radius: 10px; padding: 12px 18px; font: inherit; font-weight: 600; width: 100%; cursor: pointer; }
+  .err { color: var(--orange); min-height: 20px; }
+  .muted { color: var(--text2); font-size: 13px; margin: 8px 14px 0; }
+</style>
+</head>
+<body>
+<main id="app"></main>
+<script>
+const app = document.getElementById('app');
+const icons = { Motherboard:['🧩','#5e5ce6'], Gpu:['🖥','#30d158'], Ram:['▤','#ff9f0a'], Keyboard:['⌨','#0a84ff'], Mouse:['🖱','#0a84ff'],
+                Mousepad:['▭','#ff375f'], Headset:['🎧','#bf5af2'], LedController:['⚡','#64d2ff'], Cooler:['❄','#64d2ff'], Other:['●','#8e8e93'] };
+let state = null, previewTimer = null, busy = false;
+
+async function api(path, body) {
+  const r = await fetch(path, body ? { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(body) } : {});
+  if (r.status === 401) { showLogin(); throw new Error('pin'); }
+  if (r.status === 429) throw new Error('wait');
+  return r.json();
+}
+
+function showLogin(msg) {
+  clearInterval(previewTimer);
+  app.innerHTML = `<div class="login"><img src="/icon.png" width="64" height="64" alt="">
+    <h1>rgbstone</h1><p class="sub">Bilgisayardaki rgbstone ekranında görünen PIN'i gir.</p>
+    <input id="pin" inputmode="numeric" maxlength="4" autocomplete="one-time-code" autofocus>
+    <div class="err" id="err">${msg || ''}</div><button class="btn" id="go">Bağlan</button></div>`;
+  const go = async () => {
+    const pin = document.getElementById('pin').value;
+    const r = await fetch('/api/login', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({pin}) });
+    if (r.ok) return load();
+    showLogin(r.status === 429 ? 'Çok fazla deneme. Bir dakika bekle.' : 'PIN yanlış.');
+  };
+  document.getElementById('go').onclick = go;
+  document.getElementById('pin').onkeydown = e => { if (e.key === 'Enter') go(); };
+}
+
+async function load() { state = await api('/api/state'); render(); startPreview(); }
+
+async function set(patch) {
+  if (busy) return; busy = true;
+  try { state = await api('/api/set', patch); render(); } finally { busy = false; }
+}
+
+function startPreview() {
+  clearInterval(previewTimer);
+  previewTimer = setInterval(async () => {
+    try {
+      const cols = await api('/api/preview');
+      const el = document.getElementById('preview');
+      if (el) el.innerHTML = cols.map(c => `<span style="background:${c}"></span>`).join('');
+    } catch {}
+  }, 120);
+  setInterval(async () => { try { const s = await api('/api/state'); if (!busy && document.activeElement?.type !== 'range') { state = s; renderDevices(); } } catch {} }, 3000);
+}
+
+function esc(s) { return String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+
+function render() {
+  const s = state;
+  app.innerHTML = `
+    <header><img src="/icon.png" alt=""><h1>rgbstone</h1></header>
+    <p class="sub">${s.devices.length} cihaz · ${s.fps} FPS · bilgisayardaki ışıklar canlı</p>
+    <div class="preview" id="preview"></div>
+    <h2>Efekt</h2>
+    <div class="tiles">${s.effects.map(e => `<button class="tile ${e.id === s.effect ? 'on' : ''}" data-fx="${e.id}"><div class="bar" style="background:${fxBar(e.id)}"></div>${esc(e.name)}</button>`).join('')}</div>
+    <h2>Görünüm</h2>
+    <div class="card">
+      <div class="row"><div class="grow">Ana renk</div><label class="swatch" style="background:${s.color1}"><input type="color" id="c1" value="${s.color1.toLowerCase()}"></label></div>
+      <div class="row"><div class="grow">İkinci renk</div><label class="swatch" style="background:${s.color2}"><input type="color" id="c2" value="${s.color2.toLowerCase()}"></label></div>
+      <div class="row"><div style="width:90px">Hız</div><input type="range" id="speed" min="0.1" max="5" step="0.1" value="${s.speed}"><div class="val" id="speedv">${(+s.speed).toFixed(1)}×</div></div>
+      <div class="row"><div style="width:90px">Parlaklık</div><input type="range" id="bright" min="0" max="100" step="1" value="${s.brightness}"><div class="val" id="brightv">${s.brightness}%</div></div>
+    </div>
+    <h2>Cihazlar</h2>
+    <div class="card" id="devices"></div>
+    <p class="muted">Bu pano yalnızca ev ağında çalışır, internete çıkmaz. Bilgisayardaki rgbstone ayarlarından kapatabilirsin.</p>`;
+  app.querySelectorAll('[data-fx]').forEach(b => b.onclick = () => set({ effect: b.dataset.fx }));
+  document.getElementById('c1').onchange = e => set({ color1: e.target.value.toUpperCase() });
+  document.getElementById('c2').onchange = e => set({ color2: e.target.value.toUpperCase() });
+  const sp = document.getElementById('speed'), br = document.getElementById('bright');
+  sp.oninput = () => document.getElementById('speedv').textContent = (+sp.value).toFixed(1) + '×';
+  br.oninput = () => document.getElementById('brightv').textContent = br.value + '%';
+  sp.onchange = () => set({ speed: +sp.value });
+  br.onchange = () => set({ brightness: +br.value });
+  renderDevices();
+}
+
+function renderDevices() {
+  const el = document.getElementById('devices'); if (!el) return;
+  el.innerHTML = state.devices.map(d => {
+    const [g, c] = icons[d.kind] || icons.Other;
+    return `<div class="row"><div class="icon" style="background:${c}">${g}</div>
+      <div class="grow"><div>${esc(d.name)}</div><div class="detail">${d.leds} LED · ${esc(d.status)}</div></div>
+      <label class="switch"><input type="checkbox" data-dev="${esc(d.id)}" ${d.enabled ? 'checked' : ''}><span></span></label></div>`;
+  }).join('') || '<div class="row detail">Cihaz bulunamadı.</div>';
+  el.querySelectorAll('[data-dev]').forEach(i => i.onchange = () => set({ device: i.dataset.dev, enabled: i.checked }));
+}
+
+function fxBar(id) {
+  const s = state;
+  switch (id) {
+    case 'static': return s.color1;
+    case 'breathing': return `linear-gradient(90deg, #000, ${s.color1}, #000)`;
+    case 'cycle': return 'linear-gradient(90deg,#ff3b30,#ffcc00,#34c759,#0a84ff,#af52de)';
+    case 'rainbow': return 'linear-gradient(90deg,#ff3b30,#ff9500,#ffcc00,#34c759,#5ac8fa,#0a84ff,#af52de,#ff2d55)';
+    case 'gradient': return `linear-gradient(90deg, ${s.color1}, ${s.color2}, ${s.color1})`;
+    case 'comet': return `linear-gradient(90deg, #000 40%, ${s.color1} 85%, #000)`;
+    default: return '#000';
+  }
+}
+
+load().catch(() => {});
+</script>
+</body>
+</html>
