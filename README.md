@@ -6,7 +6,8 @@ Pencerenin üstündeki **GPU / RGB** düğmesiyle iki bölüm arasında geçilir
 
 ## Çalıştırma
 
-- `tweakandrgbstone.exe`'yi istediğin klasöre koy ve çalıştır. Yönetici izni ister (NVML ayar yazmak ve RAM ışıkları için).
+- `tweakandrgbstone.exe`'yi istediğin klasöre koy ve çalıştır. Yönetici izni ister (ekran kartı ayarı yazmak ve RAM ışıkları için).
+- **Ekran kartı:** NVIDIA (NVML) ve AMD Radeon (ADLX, RX 6000/9000 hedefli, henüz AMD kartta denenmedi). Ryzen dahili GPU varsa asıl kart seçilir.
 - Ayarlar, profiller ve kayıtlar exe'nin yanındaki `tweakandrgbstoneData` klasöründe tutulur. Klasör yazılamazsa `%LOCALAPPDATA%\tweakandrgbstone` kullanılır.
 - **İlk açılışta eski ayarlar alınır** (eski klasörler sadece okunur, değiştirilmez):
   - GPU: exe'nin yanındaki `GpuTweakData` klasörü, yoksa `%LOCALAPPDATA%\GpuTweak`
@@ -30,7 +31,7 @@ GPU tarafının ayrıntıları (güvenlik korumaları, otomatik ayar, doğrulama
 ## Yapı
 
 ```
-src/GpuTweak.Core     GPU: NVML, otomatik ayar, güvenlik, profiller (Tweakstone'dan, değişmedi)
+src/GpuTweak.Core     GPU: NVML ve ADLX, otomatik ayar, güvenlik, profiller (Tweakstone v0.13.0'dan, değişmedi)
 src/RgbStone.Core     RGB: efekt motoru, sürücüler, HID/NVAPI/SMBus, web panosu (rgbstone'dan, .NET 8'e taşındı)
 src/GpuTweak.App      Tek pencere, tepsi, başlangıç görevi; RGB sekmesi Rgb/ klasöründe
 tests/                GPU çekirdeği ve eski ayarları içeri alma testleri
