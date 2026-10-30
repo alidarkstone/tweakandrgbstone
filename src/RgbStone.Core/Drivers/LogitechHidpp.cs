@@ -124,6 +124,7 @@ namespace RgbStone.Drivers
             bool _singleValueOk;
 
             public override string[] ConflictingProcesses => new[] { "lghub_agent", "lghub" };
+            public override bool ConflictNeedsWindow => true; // lghub_agent restarts in the background; only the G HUB window is the user
 
             LogitechKeyboard(HidDevice shortEp, HidDevice longEp, byte index, Model m)
             {
@@ -205,7 +206,7 @@ namespace RgbStone.Drivers
             // right after it reconnects. rgbstone only sends changed keys, so with a static color it would never repaint.
             // On a reconnect notice the keyboard is taken over again (twice, to land after anything else that reacts to it),
             // and every RefreshEvery the whole frame is sent again in case the notice was missed.
-            static readonly TimeSpan RefreshEvery = TimeSpan.FromSeconds(20);
+            static readonly TimeSpan RefreshEvery = TimeSpan.FromSeconds(5);
             DateTime _nextRefresh = DateTime.MinValue;
             readonly Queue<DateTime> _retake = new Queue<DateTime>();
 

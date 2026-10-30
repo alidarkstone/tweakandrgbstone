@@ -82,6 +82,7 @@ namespace RgbStone.Drivers
         Rgb[] _last;
 
         public override string[] ConflictingProcesses => new[] { "lghub_agent", "lghub" };
+        public override bool ConflictNeedsWindow => true;
 
         internal LogitechZoneDevice(HidppLink link, string name, byte f8071, byte f8070, string idBase)
         {
