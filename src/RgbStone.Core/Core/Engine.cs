@@ -206,6 +206,11 @@ namespace RgbStone.Core
             foreach (var d in Devices) d.Paused = false;
         }
 
+        static bool HasWindow(Process p)
+        {
+            try { return p.MainWindowHandle != IntPtr.Zero; } catch { return false; }
+        }
+
         static Process[] SafeProcesses(string name)
         {
             try { return Process.GetProcessesByName(name); } catch { return new Process[0]; }
@@ -241,7 +246,7 @@ namespace RgbStone.Core
                 if (d is UnavailableDevice) continue;
                 List<string> newcomers;
                 lock (_baseline)
-                    newcomers = d.ConflictingProcesses.Where(n => Get(n).Any(p => !_baseline.Contains(p.Id))).ToList();
+                    newcomers = d.ConflictingProcesses.Where(n => Get(n).Any(p => !_baseline.Contains(p.Id) && (!d.ConflictNeedsWindow || HasWindow(p)))).ToList();
 
                 bool ram = d.Kind == DeviceKind.Ram;
                 if (newcomers.Count > 0 && !d.Paused)
