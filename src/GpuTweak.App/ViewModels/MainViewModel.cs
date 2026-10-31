@@ -64,7 +64,7 @@ public sealed class MainViewModel : ObservableObject, IDisposable
         _active = backend.ReadCurrentSettings();
         LoadIntoEditor(_active);
 
-        foreach (var p in _profileStore.Profiles.Where(p => ProfileStore.SameGpu(p.GpuName, Info.Name))) Profiles.Add(p);
+        foreach (var p in VisibleProfiles()) Profiles.Add(p);
         Profiles.CollectionChanged += (_, _) => OnPropertyChanged(nameof(HasProfiles));
         foreach (var s in CommunityProfileDb.Load(dataDirectory).ForGpu(Info)) Suggestions.Add(s);
 
@@ -404,7 +404,7 @@ public sealed class MainViewModel : ObservableObject, IDisposable
         Stability.Update(_stability.State, _sessions.CurrentGame);
         // Profile rows take their button texts when created; rebuild them.
         Profiles.Clear();
-        foreach (var p in _profileStore.Profiles.Where(p => ProfileStore.SameGpu(p.GpuName, Info.Name))) Profiles.Add(p);
+        foreach (var p in VisibleProfiles()) Profiles.Add(p);
         RefreshSilicon();
         OnPropertyChanged(string.Empty);
     }
@@ -476,7 +476,7 @@ public sealed class MainViewModel : ObservableObject, IDisposable
         if (dialog.ShowDialog() != true) return;
         var added = _profileStore.ImportFrom(dialog.FileName);
         Profiles.Clear();
-        foreach (var p in _profileStore.Profiles.Where(p => ProfileStore.SameGpu(p.GpuName, Info.Name))) Profiles.Add(p);
+        foreach (var p in VisibleProfiles()) Profiles.Add(p);
         Status = added > 0 ? L.F("{0} profil içe aktarıldı.", added) : L.T("İçe aktarılacak yeni profil bulunamadı.");
         StatusIsWarning = false;
     }
@@ -646,7 +646,7 @@ public sealed class MainViewModel : ObservableObject, IDisposable
     {
         _profileStore.Save(updated);
         Profiles.Clear();
-        foreach (var p in _profileStore.Profiles.Where(p => ProfileStore.SameGpu(p.GpuName, Info.Name))) Profiles.Add(p);
+        foreach (var p in VisibleProfiles()) Profiles.Add(p);
     }
 
     private void ToggleAutoApply(UserProfile? profile)
@@ -980,7 +980,7 @@ public sealed class MainViewModel : ObservableObject, IDisposable
                 _profileStore.Save(profile with { Settings = adjustment.Settings });
         }
         Profiles.Clear();
-        foreach (var p in _profileStore.Profiles.Where(p => ProfileStore.SameGpu(p.GpuName, Info.Name))) Profiles.Add(p);
+        foreach (var p in VisibleProfiles()) Profiles.Add(p);
 
         if (!_active.IsStock && !IsConfirmPending)
         {
@@ -1002,6 +1002,16 @@ public sealed class MainViewModel : ObservableObject, IDisposable
         if (_activeProfileName is { } name) parts.Add(L.F("Profil: {0}", name));
         var text = string.Join(" · ", parts);
         return text.Length <= 127 ? text : text[..126] + "…";  // NotifyIcon.Text limit
+    }
+
+    /// <summary>
+    /// The profiles of this card. When none carries this card's name but some exist (saved while the driver or backend
+    /// reported the card under another name), all of them are shown rather than an empty list.
+    /// </summary>
+    private IEnumerable<UserProfile> VisibleProfiles()
+    {
+        var mine = _profileStore.Profiles.Where(p => ProfileStore.SameGpu(p.GpuName, Info.Name)).ToList();
+        return mine.Count > 0 ? mine : _profileStore.Profiles;
     }
 
     private UserProfile? ActiveProfile() =>
