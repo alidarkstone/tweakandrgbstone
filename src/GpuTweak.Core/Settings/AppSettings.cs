@@ -7,6 +7,8 @@ public enum OverlayCorner { TopLeft, TopRight, BottomLeft, BottomRight }
 public sealed record OverlaySettings
 {
     public bool Enabled { get; init; } = true;
+    /// <summary>Show the widget by itself while a game is detected (sustained load in the foreground app), even when it is switched off.</summary>
+    public bool AutoShowInGames { get; init; }
     public OverlayCorner Corner { get; init; } = OverlayCorner.TopLeft;
     /// <summary>0.2 … 1.0, background opacity of the widget.</summary>
     public double Opacity { get; init; } = 0.75;

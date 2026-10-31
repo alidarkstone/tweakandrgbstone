@@ -47,7 +47,7 @@ public partial class MainWindow : Window
                 Root.Background = (Brush)FindResource("WindowTintBrush");
             }
             _hotKey = new GlobalHotKey(this, GlobalHotKey.ModControl | GlobalHotKey.ModShift, (uint)KeyInterop.VirtualKeyFromKey(Key.O),
-                () => viewModel.Overlay.Enabled = !viewModel.Overlay.Enabled);
+                () => viewModel.Overlay.Toggle());
             // Report an artifact without leaving the game.
             _artifactHotKey = new GlobalHotKey(this, GlobalHotKey.ModControl | GlobalHotKey.ModShift, (uint)KeyInterop.VirtualKeyFromKey(Key.A),
                 () => { if (viewModel.ReportArtifactCommand.CanExecute(null)) viewModel.ReportArtifactCommand.Execute(null); }, id: 0x4755);

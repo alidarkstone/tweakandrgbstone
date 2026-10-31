@@ -236,6 +236,12 @@
                                             <TextBlock Style="{StaticResource Caption}" local:Loc.Text="Kısayol: Ctrl + Shift + O. Pencereli ve kenarlıksız tam ekranda görünür."/>
                                         </StackPanel>
                                     </CheckBox>
+                                    <CheckBox Style="{StaticResource Switch}" IsChecked="{Binding AutoShowInGames}" Margin="0,10,0,0">
+                                        <StackPanel>
+                                            <TextBlock local:Loc.Text="Oyunlarda otomatik açıl"/>
+                                            <TextBlock Style="{StaticResource Caption}" TextWrapping="Wrap" local:Loc.Text="Widget kapalıyken bile oyun algılanınca (yaklaşık 30 saniyelik yükten sonra) kendiliğinden görünür, oyun bitince gizlenir."/>
+                                        </StackPanel>
+                                    </CheckBox>
 
                                     <TextBlock local:Loc.Text="Konum" Margin="0,14,0,6"/>
                                     <Border CornerRadius="9" Background="{StaticResource FillBrush}" Padding="2">

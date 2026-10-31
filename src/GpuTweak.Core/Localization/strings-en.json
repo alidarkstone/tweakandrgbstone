@@ -313,5 +313,7 @@
  "Sorun sayacını sıfırla": "Reset problem counter",
  "Şimdiye kadarki sorunlar ayarlardan değildi (ör. sürücü hatası): kayıtta kalır ama sayılmaz": "The problems so far were not caused by the settings (e.g. a driver bug): they stay in the log but no longer count",
  "Başka klasördeki profilleri içe aktar": "Import profiles from another folder",
- "Programın başka bir kopyasının (ör. masaüstündeki) tweakandrgbstoneData klasöründeki profiles.json": "profiles.json in the tweakandrgbstoneData folder of another copy of the app (e.g. the one on the desktop)"
+ "Programın başka bir kopyasının (ör. masaüstündeki) tweakandrgbstoneData klasöründeki profiles.json": "profiles.json in the tweakandrgbstoneData folder of another copy of the app (e.g. the one on the desktop)",
+ "Oyunlarda otomatik açıl": "Open automatically in games",
+ "Widget kapalıyken bile oyun algılanınca (yaklaşık 30 saniyelik yükten sonra) kendiliğinden görünür, oyun bitince gizlenir.": "Even while the widget is off, it appears by itself once a game is detected (after about 30 seconds of load) and hides when the game ends."
 }

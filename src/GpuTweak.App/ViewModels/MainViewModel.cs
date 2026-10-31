@@ -715,6 +715,7 @@ public sealed class MainViewModel : ObservableObject, IDisposable
         Overlay.Update(s, _frameRates.Sample(ForegroundApp.ProcessId(), PresentEventSource.Seconds(DateTime.Now)));
         Monitor.OnSample(s);
         if (!IsTuning) FeedSession(s);
+        Overlay.InGame = !IsTuning && _sessions.CurrentGame is not null;
         _stability.Heartbeat(busy: IsTuning || (s.LoadPercent ?? 0) >= 50 || _sessions.CurrentGame is not null);
 
         // While tuning, the tuner watches temperature itself (with a lower limit) and resets between steps.
