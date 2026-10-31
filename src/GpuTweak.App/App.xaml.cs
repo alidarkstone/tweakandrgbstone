@@ -61,6 +61,7 @@ public partial class App : Application
         }
 
         DataPaths.ImportLegacy(dataDirectory, AppContext.BaseDirectory);
+        DataPaths.ImportProfilesFromOtherCopy(dataDirectory);
         Directory.CreateDirectory(Path.Combine(dataDirectory, "logos"));
         L.SetLanguage(new SettingsStore(dataDirectory).Load().Language);
 

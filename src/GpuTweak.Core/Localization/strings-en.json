@@ -296,5 +296,22 @@
  "Bu çip, stok hızında voltaj -{0} mV düşürülene kadar hatasız çalıştı; daha aşağıda hata verdi. Günlük kullanımda {1} mV güvenlik payı bırakıldı. Ölçüm: {2:dd.MM.yyyy}.": "At stock clocks this chip ran error-free down to -{0} mV and failed below that. Daily use keeps a {1} mV safety margin. Measured: {2:dd.MM.yyyy}.",
  "Voltaj offset (undervolt)": "Voltage offset (undervolt)",
  "Voltajı stok değerin altına indirir: daha serin ve sessiz. Fazla düşerse oyunda çökme olur; otomatik ayar güvenli değeri kendisi bulur.": "Lowers the voltage below stock: cooler and quieter. Too low causes crashes in games; the auto-tune finds a safe value by itself.",
- "Voltaj": "Voltage"
+ "Voltaj": "Voltage",
+ "{0} · hata {1}": "{0} · error {1}",
+ "Hata öncesi ayar · {0}": "Before the error · {0}",
+ "{0} · {1}": "{0} · {1}",
+ "Önceki ayar \"{0}\" adıyla profillerde saklandı.": "The previous settings were kept in the profiles as \"{0}\".",
+ "doğrulama testi hatası · {0}": "validation test error · {0}",
+ "Hata sonrası saklandı:": "Kept after an error:",
+ "Oyun dışında (masaüstü, video)": "Outside a game (desktop, video)",
+ "NVIDIA sürücüsü {0}, RTX 50 kartlarda tarayıcıda video izlerken ekran sürücüsü çökmesine yol açan bilinen bir hataya sahip (stok ayarlarda da). 621.12 hotfix ya da daha yeni bir sürücü kur.": "NVIDIA driver {0} has a known bug that resets the display driver while playing video in a browser on RTX 50 cards (at stock settings too). Install hotfix 621.12 or a newer driver.",
+ "Sürücü hatası olduğunu düşünüyorsan \"Son düzeltmeyi geri al\"a bas.": "If you think it was the driver bug, press \"Undo last correction\".",
+ "Sorun sayacı sıfırlandı. Önceki sorunlar kayıtta kalır ama ayarlara sayılmaz.": "The problem counter was reset. Earlier problems stay in the log but no longer count against the settings.",
+ "Başka bir klasördeki profiles.json dosyasını seç": "Choose the profiles.json file in another folder",
+ "{0} profil içe aktarıldı.": "Imported {0} profiles.",
+ "İçe aktarılacak yeni profil bulunamadı.": "No new profiles to import.",
+ "Sorun sayacını sıfırla": "Reset problem counter",
+ "Şimdiye kadarki sorunlar ayarlardan değildi (ör. sürücü hatası): kayıtta kalır ama sayılmaz": "The problems so far were not caused by the settings (e.g. a driver bug): they stay in the log but no longer count",
+ "Başka klasördeki profilleri içe aktar": "Import profiles from another folder",
+ "Programın başka bir kopyasının (ör. masaüstündeki) tweakandrgbstoneData klasöründeki profiles.json": "profiles.json in the tweakandrgbstoneData folder of another copy of the app (e.g. the one on the desktop)"
 }

@@ -63,6 +63,62 @@ public static class DataPaths
         return imported;
     }
 
+    /// <summary>
+    /// The data folder sits next to the exe, so a new version opened from another folder (Downloads, a new folder on the
+    /// desktop) starts with an empty profile list. When this data folder has no profiles yet, the newest profiles.json of
+    /// another copy (desktop, downloads, documents and their direct subfolders, %LOCALAPPDATA%) is copied in. The other copy
+    /// is only read. Returns the file that was copied, or null.
+    /// </summary>
+    public static string? ImportProfilesFromOtherCopy(string dataDirectory, IEnumerable<string>? roots = null)
+    {
+        var target = Path.Combine(dataDirectory, "profiles.json");
+        // An empty list ("[]") counts as no profiles.
+        if (File.Exists(target) && new FileInfo(target).Length > 2) return null;
+        var user = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+        roots ??= new[]
+        {
+            Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory), // may be redirected to OneDrive
+            Path.Combine(user, "Desktop"),
+            Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments),
+            Path.Combine(user, "Downloads"),
+            Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "tweakandrgbstone"),
+        }.Where(d => !string.IsNullOrEmpty(d));
+        var self = Path.GetFullPath(dataDirectory).TrimEnd(Path.DirectorySeparatorChar);
+        var newest = Candidates(roots)
+            .Where(f => !string.Equals(Path.GetDirectoryName(Path.GetFullPath(f)), self, StringComparison.OrdinalIgnoreCase))
+            .Select(f => new FileInfo(f))
+            .Where(f => f.Length > 2)
+            .OrderByDescending(f => f.LastWriteTimeUtc)
+            .FirstOrDefault();
+        if (newest is null) return null;
+        try
+        {
+            Directory.CreateDirectory(dataDirectory);
+            File.Copy(newest.FullName, target, overwrite: true);
+            return newest.FullName;
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException) { return null; }
+    }
+
+    private static IEnumerable<string> Candidates(IEnumerable<string> roots)
+    {
+        foreach (var root in roots.Distinct(StringComparer.OrdinalIgnoreCase))
+        {
+            if (!Directory.Exists(root)) continue;
+            // The root itself may be a data folder (%LOCALAPPDATA%\tweakandrgbstone).
+            var dirs = new List<string> { root };
+            try { dirs.AddRange(Directory.EnumerateDirectories(root)); } catch (Exception e) when (e is IOException or UnauthorizedAccessException) { }
+            foreach (var dir in dirs.ToList())
+                foreach (var name in new[] { FolderName, "GpuTweakData" })
+                    dirs.Add(Path.Combine(dir, name));
+            foreach (var dir in dirs)
+            {
+                var file = Path.Combine(dir, "profiles.json");
+                if (File.Exists(file)) yield return file;
+            }
+        }
+    }
+
     private static void CopyTree(string from, string to)
     {
         foreach (var file in Directory.EnumerateFiles(from, "*", SearchOption.AllDirectories))
