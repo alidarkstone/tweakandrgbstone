@@ -115,8 +115,14 @@ public sealed class MainViewModel : ObservableObject, IDisposable
         ReportArtifactCommand = new RelayCommand(ReportArtifact, () => !IsTuning);
         MarkStableCommand = new RelayCommand(MarkActiveStable, () => CanMarkStable);
 
-        // Keep the startup task pointing at this exe, in case the user moved it or downloaded a newer version.
-        if (_startWithWindows) StartupTask.Enable();
+        // The startup task is only written when the user turns the option on. Re-writing it silently on every start, from
+        // whatever exe was just opened (e.g. a new download), is what Defender reports as Behavior:Win32/Persistence.
+        if (_startWithWindows && StartupTask.TargetPath() is { } target
+            && !string.Equals(System.IO.Path.GetFullPath(target), Environment.ProcessPath, StringComparison.OrdinalIgnoreCase))
+        {
+            Status = L.T("Windows başlangıç görevi başka bir exe'yi açıyor. Bu exe'yi kullanmak için \"Windows ile başlat\" seçeneğini kapatıp açın.");
+            StatusIsWarning = true;
+        }
 
         _presents = new PresentEventSource(_frameRates);
         _telemetry = new TelemetryService(backend, TimeSpan.FromMilliseconds(_settings.PollIntervalMs));

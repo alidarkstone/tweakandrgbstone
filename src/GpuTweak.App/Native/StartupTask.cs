@@ -21,6 +21,19 @@ internal static class StartupTask
         return Run("/Create", "/TN", TaskName, "/TR", $"\"{exe}\" {StartupArgument}", "/SC", "ONLOGON", "/RL", "HIGHEST", "/F") == 0;
     }
 
+    /// <summary>The exe the existing task starts, or null when there is no task or it cannot be read.</summary>
+    public static string? TargetPath()
+    {
+        var info = new ProcessStartInfo("schtasks.exe") { UseShellExecute = false, CreateNoWindow = true, RedirectStandardOutput = true, RedirectStandardError = true };
+        foreach (var a in new[] { "/Query", "/TN", TaskName, "/XML" }) info.ArgumentList.Add(a);
+        using var process = Process.Start(info)!;
+        var xml = process.StandardOutput.ReadToEnd();
+        process.WaitForExit(10_000);
+        if (process.ExitCode != 0) return null;
+        var m = System.Text.RegularExpressions.Regex.Match(xml, "<Command>(.*?)</Command>");
+        return m.Success ? System.Net.WebUtility.HtmlDecode(m.Groups[1].Value).Trim('"') : null;
+    }
+
     public static bool Disable() => Run("/Delete", "/TN", TaskName, "/F") == 0 || !IsEnabled();
 
     /// <summary>Old Tweakstone / rgbstone start-up tasks that still exist. Running them next to this app would fight over the card and the LEDs.</summary>
