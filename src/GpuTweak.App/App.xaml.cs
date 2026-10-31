@@ -68,7 +68,15 @@ public partial class App : Application
         var crash = new CrashGuard(dataDirectory).BeginSession();
 
         var demo = e.Args.Any(a => a.Equals("--demo", StringComparison.OrdinalIgnoreCase));
+        var startup = e.Args.Any(a => a.Equals(Native.StartupTask.StartupArgument, StringComparison.OrdinalIgnoreCase));
         var backend = GpuBackendFactory.Create(demo);
+        // At sign-in the graphics driver can still be loading; a hidden question would block the start-up.
+        for (int i = 0; backend is null && startup && i < 6; i++)
+        {
+            Thread.Sleep(5000);
+            backend = GpuBackendFactory.Create(demo);
+        }
+        if (backend is null && startup) backend = new DemoBackend();
         if (backend is null)
         {
             var answer = MessageBox.Show(
@@ -83,7 +91,6 @@ public partial class App : Application
             backend = new DemoBackend();
         }
 
-        var startup = e.Args.Any(a => a.Equals(Native.StartupTask.StartupArgument, StringComparison.OrdinalIgnoreCase));
         if (!startup) OfferToRemoveLegacyStartupTasks(dataDirectory);
 
         _viewModel = new MainViewModel(backend, dataDirectory, crash);
