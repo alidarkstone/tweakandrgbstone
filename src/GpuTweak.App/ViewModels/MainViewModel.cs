@@ -409,6 +409,27 @@ public sealed class MainViewModel : ObservableObject, IDisposable
         OnPropertyChanged(string.Empty);
     }
 
+    /// <summary>
+    /// The user creates the start-up task from an administrator terminal: the app creating an elevated logon task for
+    /// itself is reported by Defender as Behavior:Win32/Persistence.A!ml. Returns true once the task exists.
+    /// </summary>
+    private bool AskUserToCreateStartupTask()
+    {
+        string command;
+        try { command = StartupTask.WriteDefinition(_dataDirectory); }
+        catch { return false; }
+        try { Clipboard.SetText(command); } catch { }
+        while (true)
+        {
+            var answer = MessageBox.Show(
+                L.F("Windows ile başlatmayı Defender'a takılmadan açmak için görevi bir kez sen oluşturmalısın:\n\n1. Başlat'a sağ tıkla, \"Terminal (Yönetici)\" aç.\n2. Ctrl+V ile yapıştır, Enter'a bas (komut panoya kopyalandı):\n\n{0}\n\n3. \"BAŞARILI\" yazınca Tamam'a bas.", command),
+                "tweakandrgbstone", MessageBoxButton.OKCancel, MessageBoxImage.Information);
+            if (answer != MessageBoxResult.OK) return false;
+            if (StartupTask.IsEnabled()) return true;
+            MessageBox.Show(L.T("Görev henüz yok. Komutu yönetici terminalinde çalıştırdığından emin ol."), "tweakandrgbstone", MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
+    }
+
     private bool _startWithWindows = StartupTask.IsEnabled();
     /// <summary>Starts the app at sign-in, so the profile marked stable + automatic is applied again after every reboot.</summary>
     public bool StartWithWindows
@@ -417,7 +438,7 @@ public sealed class MainViewModel : ObservableObject, IDisposable
         set
         {
             if (value == _startWithWindows) return;
-            var ok = value ? StartupTask.Enable() : StartupTask.Disable();
+            var ok = value ? AskUserToCreateStartupTask() : StartupTask.Disable();
             if (ok) _startWithWindows = value;
             OnPropertyChanged();
             if (!ok)

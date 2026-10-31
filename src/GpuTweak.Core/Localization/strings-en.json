@@ -15,6 +15,8 @@
  "Güç {0:0} W → {1:0} W   ·   Sıcaklık {2:0}° → {3:0}°   ·   Performans %{4:0}": "Power {0:0} W → {1:0} W   ·   Temperature {2:0}° → {3:0}°   ·   Performance {4:0}%",
  "Otomatik ayarı bir kez çalıştırınca çipinin ne kadar kaldırdığı burada görünür.": "Run auto-tune once and this shows how much headroom your chip has.",
  "Windows başlangıç görevi ayarlanamadı.": "Could not set up the Windows startup task.",
+ "Windows ile başlatmayı Defender'a takılmadan açmak için görevi bir kez sen oluşturmalısın:\n\n1. Başlat'a sağ tıkla, \"Terminal (Yönetici)\" aç.\n2. Ctrl+V ile yapıştır, Enter'a bas (komut panoya kopyalandı):\n\n{0}\n\n3. \"BAŞARILI\" yazınca Tamam'a bas.": "To turn on Start with Windows without a Defender alert, create the task yourself once:\n\n1. Right-click Start, open \"Terminal (Admin)\".\n2. Paste with Ctrl+V and press Enter (the command was copied):\n\n{0}\n\n3. Press OK when it says \"SUCCESS\".",
+ "Görev henüz yok. Komutu yönetici terminalinde çalıştırdığından emin ol.": "The task does not exist yet. Make sure you ran the command in an administrator terminal.",
  "Windows başlangıç görevi başka bir exe'yi açıyor. Bu exe'yi kullanmak için \"Windows ile başlat\" seçeneğini kapatıp açın.": "The Windows startup task opens a different exe. Turn \"Start with Windows\" off and on to use this one.",
  "Program artık Windows ile açılacak. Ayarının da uygulanması için bir profili \"Stabil\" ve \"Otomatik: açık\" yap.": "The app now starts with Windows. To apply your settings too, mark a profile \"Stable\" and turn \"Auto: on\".",
  "Otomatik ayar çalışıyor": "Auto-tune running",
