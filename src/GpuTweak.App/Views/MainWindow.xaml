@@ -426,6 +426,10 @@
                                         <Button Style="{StaticResource PillButton}" Background="#33FFFFFF" Foreground="White" HorizontalAlignment="Left" Margin="0,6,0,0"
                                                 local:Loc.Content="Son düzeltmeyi geri al" Command="{Binding UndoStabilityCommand}"/>
                                     </StackPanel>
+                                    <Button Style="{StaticResource LinkButton}" local:Loc.Content="Sorun sayacını sıfırla" HorizontalAlignment="Left" Margin="-6,6,0,0"
+                                            local:Loc.ToolTip="Şimdiye kadarki sorunlar ayarlardan değildi (ör. sürücü hatası): kayıtta kalır ama sayılmaz"
+                                            Command="{Binding ResetIncidentsCommand}"
+                                            Visibility="{Binding Stability.IncidentCount, Converter={x:Static local:Converters.NonZeroToVisible}}"/>
 
                                     <Rectangle Height="1" Fill="{StaticResource SeparatorBrush}" Margin="0,14"/>
                                     <CheckBox Style="{StaticResource Switch}" IsChecked="{Binding AutoFixStability}">
@@ -462,6 +466,9 @@
                                     </CheckBox>
                                     <Button Style="{StaticResource LinkButton}" local:Loc.Content="Ayarların kaydedildiği klasörü aç" HorizontalAlignment="Left" Margin="-6,6,0,0"
                                             Command="{Binding OpenDataFolderCommand}" ToolTip="{Binding DataFolder}"/>
+                                    <Button Style="{StaticResource LinkButton}" local:Loc.Content="Başka klasördeki profilleri içe aktar" HorizontalAlignment="Left" Margin="-6,0,0,0"
+                                            local:Loc.ToolTip="Programın başka bir kopyasının (ör. masaüstündeki) tweakandrgbstoneData klasöründeki profiles.json"
+                                            Command="{Binding ImportProfilesCommand}"/>
                                     <TextBlock Style="{StaticResource Caption}" Margin="0,10,0,0" Foreground="{StaticResource TertiaryTextBrush}"
                                                local:Loc.Text="Henüz kayıtlı profil yok. Ayarları yap, aşağıya bir ad yaz ve kaydet; profil burada bir satır olarak görünür ve tek tıkla geri uygulanır."
                                                Visibility="{Binding HasProfiles, Converter={x:Static local:Converters.FalseToVisible}}"/>
@@ -476,6 +483,10 @@
                                                         </Grid.ColumnDefinitions>
                                                         <StackPanel VerticalAlignment="Center">
                                                             <TextBlock Text="{Binding Name}" FontWeight="SemiBold"/>
+                                                            <TextBlock Style="{StaticResource Caption}" Foreground="{StaticResource OrangeBrush}" TextWrapping="Wrap"
+                                                                       Visibility="{Binding FailedReason, Converter={x:Static local:Converters.NotEmptyToVisibility}}">
+                                                                <Run Text="{local:T 'Hata sonrası saklandı:'}"/><Run Text=" "/><Run Text="{Binding FailedReason, Mode=OneWay}"/>
+                                                            </TextBlock>
                                                             <TextBlock Style="{StaticResource Caption}">
                                                                 <Run Text="{local:T Çekirdek}"/><Run Text=" "/><Run Text="{Binding Settings.CoreOffsetMHz, Mode=OneWay, StringFormat={}{0:+0;-0;0}}"/><Run Text=" · "/><Run Text="{local:T Bellek}"/><Run Text=" "/><Run Text="{Binding Settings.MemoryOffsetMHz, Mode=OneWay, StringFormat={}{0:+0;-0;0}}"/>
                                                             </TextBlock>
