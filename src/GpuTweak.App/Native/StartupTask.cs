@@ -1,4 +1,3 @@
-using System.IO;
 using System.Security;
 using System.Security.Principal;
 
@@ -7,10 +6,9 @@ namespace GpuTweak.App.Native;
 /// <summary>
 /// Starts tweakandrgbstone at Windows sign-in. A Task Scheduler task is used instead of the Run registry key,
 /// because the app needs administrator rights and Run-key entries are not allowed to elevate.
-/// The app never registers the task itself: an unsigned exe that creates an elevated logon task for itself is what
-/// Defender reports as Behavior:Win32/Persistence.A!ml, whether it uses schtasks.exe or the Task Scheduler API.
-/// It writes the task definition next to its settings and the user imports it once from an administrator terminal.
-/// Reading and deleting tasks is not flagged and stays here.
+/// The task is registered through the Task Scheduler API and only when the user turns the option on. Starting
+/// "schtasks /Create /SC ONLOGON /RL HIGHEST" as a child process, or re-writing the task on every launch, is what
+/// Defender reported as Behavior:Win32/Persistence.A!ml.
 /// </summary>
 internal static class StartupTask
 {
@@ -34,8 +32,9 @@ internal static class StartupTask
 
     public static bool IsEnabled() => Find(TaskName) is not null;
 
-    /// <summary>Writes the task definition for this exe and returns the command that creates it from an administrator terminal.</summary>
-    public static string WriteDefinition(string dataDirectory)
+    private const int CreateOrUpdate = 6, LogonInteractiveToken = 3;
+
+    public static bool Enable()
     {
         var exe = Environment.ProcessPath ?? throw new InvalidOperationException("Exe yolu bulunamadı.");
         var sid = WindowsIdentity.GetCurrent().User?.Value ?? throw new InvalidOperationException("Kullanıcı bulunamadı.");
@@ -55,9 +54,12 @@ internal static class StartupTask
               <Actions Context="Author"><Exec><Command>{SecurityElement.Escape(exe)}</Command><Arguments>{StartupArgument}</Arguments></Exec></Actions>
             </Task>
             """;
-        var path = Path.Combine(dataDirectory, "windows-ile-baslat.xml");
-        File.WriteAllText(path, xml, System.Text.Encoding.Unicode);
-        return $"schtasks /Create /F /TN {TaskName} /XML \"{path}\"";
+        try
+        {
+            RootFolder().RegisterTask(TaskName, xml, CreateOrUpdate, null, null, LogonInteractiveToken, null);
+            return IsEnabled();
+        }
+        catch { return false; }
     }
 
     /// <summary>The exe the existing task starts, or null when there is no task or it cannot be read.</summary>
