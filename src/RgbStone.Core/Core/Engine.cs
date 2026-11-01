@@ -163,9 +163,15 @@ namespace RgbStone.Core
         List<string> _missing = new List<string>();
         int _missingRetries;
         DateTime _nextMissingRetry;
+        List<HidDeviceInfo> _lastHid = new List<HidDeviceInfo>();
+        // A Logitech keyboard that sleeps until a key is pressed can take longer than the retries above; its receiver is
+        // asked every LogitechProbeEvery whether it answers, and only then is the whole scan repeated.
+        static readonly TimeSpan LogitechProbeEvery = TimeSpan.FromSeconds(10);
+        DateTime _nextLogitechProbe;
 
         void FindMissing(List<HidDeviceInfo> hid)
         {
+            _lastHid = hid;
             var present = new HashSet<string>(hid.Select(h => $"hid:{h.VendorId:x4}:{h.ProductId:x4}"));
             _missing = _settings.Devices
                 .Where(kv => kv.Value.Enabled && kv.Key.StartsWith("hid:") && kv.Key.Length > 13 && present.Contains(kv.Key.Substring(0, 13))
@@ -293,6 +299,19 @@ namespace RgbStone.Core
                     Log.Info($"{d.Name}: üretici yazılımı kapandı, kontrol geri alınıyor.");
                     try { d.Initialize(); d.Paused = false; }
                     catch (Exception ex) { d.Status = "Geri alınamadı: " + ex.Message; Log.Error(d.Name, ex); }
+                }
+            }
+
+            if (_missing.Count > 0 && _missingRetries >= MissingRetries && DateTime.Now >= _nextLogitechProbe)
+            {
+                _nextLogitechProbe = DateTime.Now + LogitechProbeEvery;
+                var awake = _missing.FirstOrDefault(id => Drivers.LogitechHidppProvider.Answers(id, _lastHid));
+                if (awake != null)
+                {
+                    Log.Info($"{awake} şimdi cevap veriyor (klavye uyandı), yeniden taranıyor.");
+                    _rescanning = true;
+                    try { Scan(); } finally { _rescanning = false; }
+                    return;
                 }
             }
 
