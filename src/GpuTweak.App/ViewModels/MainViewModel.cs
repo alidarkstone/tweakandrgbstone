@@ -64,7 +64,7 @@ public sealed class MainViewModel : ObservableObject, IDisposable
         _active = backend.ReadCurrentSettings();
         LoadIntoEditor(_active);
 
-        foreach (var p in _profileStore.Profiles.Where(p => p.GpuName == Info.Name)) Profiles.Add(p);
+        foreach (var p in VisibleProfiles()) Profiles.Add(p);
         Profiles.CollectionChanged += (_, _) => OnPropertyChanged(nameof(HasProfiles));
         foreach (var s in CommunityProfileDb.Load(dataDirectory).ForGpu(Info)) Suggestions.Add(s);
 
@@ -77,6 +77,8 @@ public sealed class MainViewModel : ObservableObject, IDisposable
         ResumeTuneCommand = new RelayCommand(() => _ = StartTuneAsync(resume: true), () => !IsTuning && PendingJournal is not null);
         StopTuneCommand = new RelayCommand(() => _tuneCts?.Cancel(), () => IsTuning);
         UndoStabilityCommand = new RelayCommand(UndoStabilityChange, () => !IsTuning && !IsConfirmPending);
+        ResetIncidentsCommand = new RelayCommand(ResetIncidents, () => !IsTuning);
+        ImportProfilesCommand = new RelayCommand(ImportProfiles);
         StartStressCommand = new RelayCommand(() => _ = StartStressAsync(), () => !IsTuning && !IsConfirmPending);
         SaveProfileCommand = new RelayCommand(SaveProfile, () => !string.IsNullOrWhiteSpace(NewProfileName));
         LoadProfileCommand = new RelayCommand(p =>
@@ -115,8 +117,14 @@ public sealed class MainViewModel : ObservableObject, IDisposable
         ReportArtifactCommand = new RelayCommand(ReportArtifact, () => !IsTuning);
         MarkStableCommand = new RelayCommand(MarkActiveStable, () => CanMarkStable);
 
-        // Keep the startup task pointing at this exe, in case the user moved it or downloaded a newer version.
-        if (_startWithWindows) StartupTask.Enable();
+        // The startup task is only written when the user turns the option on. Re-writing it silently on every start, from
+        // whatever exe was just opened (e.g. a new download), is what Defender reports as Behavior:Win32/Persistence.
+        if (_startWithWindows && StartupTask.TargetPath() is { } target
+            && !string.Equals(System.IO.Path.GetFullPath(target), Environment.ProcessPath, StringComparison.OrdinalIgnoreCase))
+        {
+            Status = L.T("Windows başlangıç görevi başka bir exe'yi açıyor. Bu exe'yi kullanmak için \"Windows ile başlat\" seçeneğini kapatıp açın.");
+            StatusIsWarning = true;
+        }
 
         _presents = new PresentEventSource(_frameRates);
         _telemetry = new TelemetryService(backend, TimeSpan.FromMilliseconds(_settings.PollIntervalMs));
@@ -133,9 +141,23 @@ public sealed class MainViewModel : ObservableObject, IDisposable
             LoadIntoEditor(startup.Settings);
             Status ??= L.F("Stabil profil \"{0}\" otomatik uygulandı.", startup.Name);
         }
+        if (KnownDriverIssue(Info) is { } issue)
+        {
+            Status = issue + (Status is null ? "" : " " + Status);
+            StatusIsWarning = true;
+        }
         Stability.Update(_stability.State, null);
         RefreshSilicon();
     }
+
+    /// <summary>
+    /// NVIDIA 621.01 (October 2026) froze or reset the display driver during video playback in browsers on RTX 50 cards,
+    /// at stock settings too; fixed in hotfix 621.12. Such a reset says nothing about the tuning.
+    /// </summary>
+    private static string? KnownDriverIssue(GpuInfo info) =>
+        info.Vendor == GpuVendor.Nvidia && info.DriverVersion.Trim().StartsWith("621.0", StringComparison.Ordinal)
+            ? L.F("NVIDIA sürücüsü {0}, RTX 50 kartlarda tarayıcıda video izlerken ekran sürücüsü çökmesine yol açan bilinen bir hataya sahip (stok ayarlarda da). 621.12 hotfix ya da daha yeni bir sürücü kur.", info.DriverVersion.Trim())
+            : null;
 
     public GpuInfo Info { get; }
     public TuningLimits Limits { get; }
@@ -382,7 +404,7 @@ public sealed class MainViewModel : ObservableObject, IDisposable
         Stability.Update(_stability.State, _sessions.CurrentGame);
         // Profile rows take their button texts when created; rebuild them.
         Profiles.Clear();
-        foreach (var p in _profileStore.Profiles.Where(p => p.GpuName == Info.Name)) Profiles.Add(p);
+        foreach (var p in VisibleProfiles()) Profiles.Add(p);
         RefreshSilicon();
         OnPropertyChanged(string.Empty);
     }
@@ -430,6 +452,34 @@ public sealed class MainViewModel : ObservableObject, IDisposable
     public ICommand ResumeTuneCommand { get; }
     public ICommand StopTuneCommand { get; }
     public ICommand UndoStabilityCommand { get; }
+    public ICommand ResetIncidentsCommand { get; }
+    public ICommand ImportProfilesCommand { get; }
+
+    private void ResetIncidents()
+    {
+        _stability.ResetIncidents();
+        Stability.LastChange = "";
+        Stability.Update(_stability.State, _sessions.CurrentGame);
+        UpdateCanMarkStable();
+        Status = L.T("Sorun sayacı sıfırlandı. Önceki sorunlar kayıtta kalır ama ayarlara sayılmaz.");
+        StatusIsWarning = false;
+    }
+
+    private void ImportProfiles()
+    {
+        var dialog = new Microsoft.Win32.OpenFileDialog
+        {
+            Title = L.T("Başka bir klasördeki profiles.json dosyasını seç"),
+            Filter = "profiles.json|profiles.json|JSON|*.json",
+            InitialDirectory = Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory),
+        };
+        if (dialog.ShowDialog() != true) return;
+        var added = _profileStore.ImportFrom(dialog.FileName);
+        Profiles.Clear();
+        foreach (var p in VisibleProfiles()) Profiles.Add(p);
+        Status = added > 0 ? L.F("{0} profil içe aktarıldı.", added) : L.T("İçe aktarılacak yeni profil bulunamadı.");
+        StatusIsWarning = false;
+    }
     public ICommand StartStressCommand { get; }
     public ICommand ApplyCommand { get; }
     public ICommand ResetCommand { get; }
@@ -596,7 +646,7 @@ public sealed class MainViewModel : ObservableObject, IDisposable
     {
         _profileStore.Save(updated);
         Profiles.Clear();
-        foreach (var p in _profileStore.Profiles.Where(p => p.GpuName == Info.Name)) Profiles.Add(p);
+        foreach (var p in VisibleProfiles()) Profiles.Add(p);
     }
 
     private void ToggleAutoApply(UserProfile? profile)
@@ -608,7 +658,10 @@ public sealed class MainViewModel : ObservableObject, IDisposable
             StatusIsWarning = true;
             return;
         }
-        UpdateProfile(profile, profile with { AutoApplyOnStart = !profile.AutoApplyOnStart });
+        // Turning auto-apply on for a profile that was kept aside after a problem means the user trusts it again.
+        UpdateProfile(profile, profile.AutoApplyOnStart
+            ? profile with { AutoApplyOnStart = false }
+            : profile with { AutoApplyOnStart = true, FailedAt = null, FailedReason = null, ReplacedBy = null });
     }
 
     private void UseSuggestion(CommunityProfile? suggestion)
@@ -641,6 +694,7 @@ public sealed class MainViewModel : ObservableObject, IDisposable
         Overlay.Update(s, _frameRates.Sample(ForegroundApp.ProcessId(), PresentEventSource.Seconds(DateTime.Now)));
         Monitor.OnSample(s);
         if (!IsTuning) FeedSession(s);
+        Overlay.InGame = !IsTuning && _sessions.CurrentGame is not null;
         _stability.Heartbeat(busy: IsTuning || (s.LoadPercent ?? 0) >= 50 || _sessions.CurrentGame is not null);
 
         // While tuning, the tuner watches temperature itself (with a lower limit) and resets between steps.
@@ -841,7 +895,7 @@ public sealed class MainViewModel : ObservableObject, IDisposable
         foreach (var (incident, adjustment) in updates)
         {
             _sessions.MarkIncident();
-            var where = incident.Game is { } g ? L.F("{0} oyununda", g) : L.T("Oyun sırasında");
+            var where = incident.Game is { } g ? L.F("{0} oyununda", g) : L.T("Oyun dışında (masaüstü, video)");
             var what = incident.Kind switch
             {
                 IncidentKind.DriverReset => L.T("ekran sürücüsü çökmesi"),
@@ -868,8 +922,10 @@ public sealed class MainViewModel : ObservableObject, IDisposable
             }
             else
             {
-                StepDown(adjustment);
-                Status = L.F("{0} {1} algılandı. Daha güvenli ayara geçildi: {2}.", where, what, adjustment.Description);
+                var kept = StepDown(adjustment, L.F("{0} · {1}", what, adjustment.Description));
+                Status = L.F("{0} {1} algılandı. Daha güvenli ayara geçildi: {2}.", where, what, adjustment.Description)
+                    + (kept.Count > 0 ? " " + L.F("Önceki ayar \"{0}\" adıyla profillerde saklandı.", kept[0].Name) : "")
+                    + (incident.Kind == IncidentKind.DriverReset && KnownDriverIssue(Info) is { } issue ? " " + issue + " " + L.T("Sürücü hatası olduğunu düşünüyorsan \"Son düzeltmeyi geri al\"a bas.") : "");
                 StatusIsWarning = true;
                 Stability.LastChange = $"{DateTime.Now:dd.MM HH:mm} · {adjustment.Description}";
             }
@@ -888,6 +944,7 @@ public sealed class MainViewModel : ObservableObject, IDisposable
         Stability.LastChange = "";
         if (undo.From != undo.Settings)
         {
+            _profileStore.RestoreAfterUndo(Info.Name, undo.From, undo.Settings);
             StepDown(undo);
             Status = undo.Settings.VoltageOffsetMv != 0
                 ? L.F("Önceki ayara dönüldü: voltaj {0} mV, bellek +{1} MHz. Bu sorun ayarlara sayılmayacak.", undo.Settings.VoltageOffsetMv, undo.Settings.MemoryOffsetMHz)
@@ -904,19 +961,34 @@ public sealed class MainViewModel : ObservableObject, IDisposable
         RefreshSilicon();
     }
 
-    private void StepDown(Adjustment adjustment)
+    /// <summary>
+    /// Moves the card (and the profiles holding the old settings) to <see cref="Adjustment.Settings"/>. With a
+    /// <paramref name="problem"/>, the old profiles are not overwritten: each is kept in the list under a new name
+    /// ("&lt;name&gt; · hata &lt;time&gt;") and a new profile with its name takes the safer settings, so the next auto-apply is the
+    /// safer one and the last settings that worked are not lost. Returns the kept-aside profiles.
+    /// </summary>
+    private IReadOnlyList<UserProfile> StepDown(Adjustment adjustment, string? problem = null)
     {
-        // Profiles that hold the old settings get the new values, so the next auto-apply is the safer one.
-        foreach (var profile in _profileStore.Profiles.Where(p => p.GpuName == Info.Name && p.Settings == adjustment.From).ToList())
-            _profileStore.Save(profile with { Settings = adjustment.Settings });
+        IReadOnlyList<UserProfile> kept = [];
+        if (problem is not null)
+        {
+            kept = _profileStore.KeepAsideAfterProblem(Info.Name, adjustment.From, adjustment.Settings, problem, DateTimeOffset.Now);
+        }
+        else
+        {
+            // Profiles that hold the old settings get the new values (undo, or a better memory offset found by the tuner).
+            foreach (var profile in _profileStore.Profiles.Where(p => ProfileStore.SameGpu(p.GpuName, Info.Name) && !p.IsFailed && p.Settings == adjustment.From).ToList())
+                _profileStore.Save(profile with { Settings = adjustment.Settings });
+        }
         Profiles.Clear();
-        foreach (var p in _profileStore.Profiles.Where(p => p.GpuName == Info.Name)) Profiles.Add(p);
+        foreach (var p in VisibleProfiles()) Profiles.Add(p);
 
         if (!_active.IsStock && !IsConfirmPending)
         {
             ApplyDirect(adjustment.Settings, _activeProfileName);
             LoadIntoEditor(adjustment.Settings);
         }
+        return kept;
     }
 
     private string _trayText = "tweakandrgbstone";
@@ -933,8 +1005,18 @@ public sealed class MainViewModel : ObservableObject, IDisposable
         return text.Length <= 127 ? text : text[..126] + "…";  // NotifyIcon.Text limit
     }
 
+    /// <summary>
+    /// The profiles of this card. When none carries this card's name but some exist (saved while the driver or backend
+    /// reported the card under another name), all of them are shown rather than an empty list.
+    /// </summary>
+    private IEnumerable<UserProfile> VisibleProfiles()
+    {
+        var mine = _profileStore.Profiles.Where(p => ProfileStore.SameGpu(p.GpuName, Info.Name)).ToList();
+        return mine.Count > 0 ? mine : _profileStore.Profiles;
+    }
+
     private UserProfile? ActiveProfile() =>
-        _activeProfileName is { } name ? _profileStore.Profiles.FirstOrDefault(p => p.GpuName == Info.Name && p.Name == name) : null;
+        _activeProfileName is { } name ? _profileStore.Profiles.FirstOrDefault(p => ProfileStore.SameGpu(p.GpuName, Info.Name) && p.Name == name) : null;
 
     private void UpdateCanMarkStable() =>
         CanMarkStable = StabilityAdvisor.ShouldSuggestStable(_stability.State) && ActiveProfile() is { IsStable: false };
@@ -1025,8 +1107,9 @@ public sealed class MainViewModel : ObservableObject, IDisposable
             var description = final.VoltageOffsetMv != settings.VoltageOffsetMv
                 ? L.F("voltaj {0} → {1} mV", settings.VoltageOffsetMv, final.VoltageOffsetMv)
                 : L.F("çekirdek +{0} → +{1} MHz", settings.CoreOffsetMHz, final.CoreOffsetMHz);
-            StepDown(new Adjustment(settings, final, description));
-            TuneMessage = L.F("Doğrulama testi geçti, ama önce hata buldu; ayar bir miktar düşürüldü: {0}.", description) + " " + summary;
+            var kept = StepDown(new Adjustment(settings, final, description), L.F("doğrulama testi hatası · {0}", description));
+            TuneMessage = L.F("Doğrulama testi geçti, ama önce hata buldu; ayar bir miktar düşürüldü: {0}.", description) + " " + summary
+                + (kept.Count > 0 ? " " + L.F("Önceki ayar \"{0}\" adıyla profillerde saklandı.", kept[0].Name) : "");
             Status = L.F("Ayar daha güvenli hale getirildi: {0}.", description);
             StatusIsWarning = false;
         }

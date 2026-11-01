@@ -83,6 +83,11 @@ namespace RgbStone.Core
         public string Status { get; set; } = "Hazır";
         /// <summary>Processes of the vendor's own software, shown as a hint when they may fight over the device.</summary>
         public virtual string[] ConflictingProcesses => new string[0];
+        /// <summary>
+        /// True when a vendor process only means "the user opened the vendor app" while it shows a window. Background agents
+        /// restart on their own (updates, wake from sleep), and taking that as a hand-back left the device paused.
+        /// </summary>
+        public virtual bool ConflictNeedsWindow => false;
         /// <summary>True while vendor software that was started after rgbstone owns the device; the engine skips it.</summary>
         public volatile bool Paused;
 
