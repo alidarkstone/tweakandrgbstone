@@ -74,6 +74,7 @@ namespace RgbStone.Core
 
         public void Scan()
         {
+            _processSnapshot = null; // a scan may stop vendor helpers; look at live processes from here on
             lock (_scanLock)
             {
                 _inScan = true;
@@ -243,9 +244,26 @@ namespace RgbStone.Core
             try { return p.MainWindowHandle != IntPtr.Zero; } catch { return false; }
         }
 
+        // GetProcessesByName walks every process on the system each call, and one watch pass asks for a dozen names.
+        // The watcher takes one snapshot per pass instead (by far the largest idle cost of the RGB side).
+        [ThreadStatic] static Dictionary<string, Process[]> _processSnapshot;
+
         static Process[] SafeProcesses(string name)
         {
+            var snap = _processSnapshot;
+            if (snap != null) return snap.TryGetValue(name, out var found) ? found : new Process[0];
             try { return Process.GetProcessesByName(name); } catch { return new Process[0]; }
+        }
+
+        /// <summary>True when a process with this name runs (from the watcher's snapshot when there is one).</summary>
+        public static bool IsRunning(string name) => SafeProcesses(name).Length > 0;
+
+        static Dictionary<string, Process[]> TakeProcessSnapshot()
+        {
+            Process[] all;
+            try { all = Process.GetProcesses(); } catch { return null; }
+            return all.GroupBy(p => { try { return p.ProcessName; } catch { return ""; } }, StringComparer.OrdinalIgnoreCase)
+                      .ToDictionary(g => g.Key, g => g.ToArray(), StringComparer.OrdinalIgnoreCase);
         }
 
         void EnsureWatcher()
@@ -261,7 +279,14 @@ namespace RgbStone.Core
             {
                 Thread.Sleep(2000);
                 if (_rescanning || _inScan) continue;
+                var snap = TakeProcessSnapshot();
+                _processSnapshot = snap;
                 try { WatchOnce(); } catch (Exception ex) { Log.Error("İzleme", ex); }
+                finally
+                {
+                    _processSnapshot = null;
+                    if (snap != null) foreach (var list in snap.Values) foreach (var p in list) p.Dispose();
+                }
             }
         }
 
@@ -360,7 +385,7 @@ namespace RgbStone.Core
         {
             if (!_settings.VendorTakeover || DateTime.Now < _retakeBlockedUntil || !TakeoverNeeded(devices)) return;
             if (VendorApps.Any(n => SafeProcesses(n).Length > 0)) return;
-            if (!VendorTakeover.TargetsRunning()) return;
+            if (!VendorTakeover.TargetsRunning(IsRunning)) return;
 
             var now = DateTime.Now;
             while (_retakes.Count > 0 && now - _retakes.Peek() > RetakeWindow) _retakes.Dequeue();
@@ -397,7 +422,7 @@ namespace RgbStone.Core
         public static readonly string[] SmbusUsers = { "SignalRgb", "iCUE", "OpenRGB", "LightingService", "LightKeeperService", "Mystic_Light_Service", "LEDKeeper2", "HWiNFO64", "HWiNFO32", "AIDA64", "CPUID HWMonitor", "ZenTimings" };
 
         public static string[] SmbusUsersRunning() =>
-            SmbusUsers.Where(p => { try { return Process.GetProcessesByName(p).Length > 0; } catch { return false; } }).ToArray();
+            SmbusUsers.Where(IsRunning).ToArray();
 
         public void ApplyZoneSettings()
         {
@@ -457,10 +482,26 @@ namespace RgbStone.Core
         [System.Runtime.InteropServices.DllImport("winmm.dll")] static extern uint timeBeginPeriod(uint ms);
         [System.Runtime.InteropServices.DllImport("winmm.dll")] static extern uint timeEndPeriod(uint ms);
 
+        /// <summary>
+        /// Effects whose colors do not change over time. They are still resent (some controllers fall back to their own
+        /// effect when nobody writes), but at the lowest rate instead of the animation rate.
+        /// </summary>
+        static bool IsStill(string effectId) => effectId == "static" || effectId == "off";
+        const int StillFps = 5;
+
+        bool _fineTimer;
+
+        /// <summary>1 ms sleep resolution keeps animations even, but raises the timer rate; only hold it while animating.</summary>
+        void FineTimer(bool on)
+        {
+            if (on == _fineTimer) return;
+            if (on) timeBeginPeriod(1); else timeEndPeriod(1);
+            _fineTimer = on;
+        }
+
         void ClockLoop()
         {
-            timeBeginPeriod(1); // 1 ms sleep resolution for an even frame rate
-            try { ClockLoopCore(); } finally { timeEndPeriod(1); }
+            try { ClockLoopCore(); } finally { FineTimer(false); }
         }
 
         void ClockLoopCore()
@@ -470,7 +511,9 @@ namespace RgbStone.Core
             while (_running)
             {
                 long start = _time.ElapsedTicks;
-                int fps = Math.Max(5, Math.Min(60, _settings.Fps));
+                bool still = IsStill(_settings.Effect);
+                FineTimer(!still);
+                int fps = still ? StillFps : Math.Max(5, Math.Min(60, _settings.Fps));
                 foreach (var w in _workers)
                 {
                     if (w.Busy || w.Device.Paused || !_settings.For(w.Device.Id).Enabled) continue;

@@ -695,6 +695,8 @@ public sealed class MainViewModel : ObservableObject, IDisposable
         Monitor.OnSample(s);
         if (!IsTuning) FeedSession(s);
         Overlay.InGame = !IsTuning && _sessions.CurrentGame is not null;
+        // Listening to every Present on the system costs CPU; only do it while the widget shows FPS.
+        _presents.Active = Overlay.IsShown && Overlay.ShowFps;
         _stability.Heartbeat(busy: IsTuning || (s.LoadPercent ?? 0) >= 50 || _sessions.CurrentGame is not null);
 
         // While tuning, the tuner watches temperature itself (with a lower limit) and resets between steps.
