@@ -15,6 +15,9 @@
 
         <!-- One app, two parts: GPU tuning (formerly Tweakstone) and RGB lighting (formerly rgbstone). -->
         <Border HorizontalAlignment="Center" Margin="0,10,0,4" CornerRadius="9" Background="{StaticResource FillBrush}" Padding="2">
+            <Border.LayoutTransform>
+                <ScaleTransform x:Name="TabScale" ScaleX="1" ScaleY="1"/>
+            </Border.LayoutTransform>
             <StackPanel Orientation="Horizontal">
                 <RadioButton x:Name="GpuTab" Style="{StaticResource Segment}" GroupName="AppTabs" IsChecked="True" Checked="OnTabChecked" MinWidth="90">
                     <TextBlock Text="GPU" FontWeight="SemiBold"/>
@@ -26,9 +29,13 @@
         </Border>
 
         <Grid x:Name="GpuPage" Grid.Row="1">
-            <!-- The whole layout is designed at a fixed size and scaled to fit the window, so it never needs scrolling. -->
-            <Viewbox Stretch="Uniform" VerticalAlignment="Top">
-                <Grid Width="1400" Margin="28,22,28,28">
+            <!-- The layout is designed at a fixed width and scaled with the window width (see UpdateUiScale),
+                 so text grows on a big window; when it is taller than the window it scrolls. -->
+            <ScrollViewer x:Name="GpuScroll" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto" Focusable="False">
+                <Grid x:Name="GpuContent" Width="1400" Margin="28,22,28,28" HorizontalAlignment="Center" VerticalAlignment="Top">
+                    <Grid.LayoutTransform>
+                        <ScaleTransform x:Name="GpuScale" ScaleX="1" ScaleY="1"/>
+                    </Grid.LayoutTransform>
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto"/>
                         <RowDefinition Height="Auto"/>
@@ -627,7 +634,7 @@
                     <local:TuneMonitorView Grid.Row="3" Margin="0,0,0,0"
                                            Visibility="{Binding IsMonitorVisible, Converter={StaticResource BoolToVisibility}}"/>
                 </Grid>
-            </Viewbox>
+            </ScrollViewer>
 
             <!-- Bottom area: confirmation banner -->
             <StackPanel VerticalAlignment="Bottom" Margin="28,0,28,20">
@@ -653,6 +660,10 @@
         </Grid>
 
         <!-- Filled in code with the RGB view, so the RGB engine keeps running whichever tab is shown. -->
-        <ContentControl x:Name="RgbPage" Grid.Row="1" Visibility="Collapsed" Focusable="False"/>
+        <ContentControl x:Name="RgbPage" Grid.Row="1" Visibility="Collapsed" Focusable="False">
+            <ContentControl.LayoutTransform>
+                <ScaleTransform x:Name="RgbScale" ScaleX="1" ScaleY="1"/>
+            </ContentControl.LayoutTransform>
+        </ContentControl>
     </Grid>
 </Window>

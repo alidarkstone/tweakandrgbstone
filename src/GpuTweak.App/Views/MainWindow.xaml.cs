@@ -17,8 +17,11 @@ public partial class MainWindow : Window
     private readonly RgbView _rgb;
     private bool _exiting;
 
-    // Layout design size (see the Viewbox in MainWindow.xaml); used to open the window with the right proportions.
-    private const double DesignWidth = 1400, DesignHeight = 1480;
+    // GPU layout design size (GpuContent in MainWindow.xaml, plus its margins); used for the opening size and the UI scale.
+    private const double DesignWidth = 1400, DesignHeight = 1480, GpuLayoutWidth = 1456;
+    // Window size the RGB page and the tab switch are designed for; they grow from here, never shrink.
+    private const double BaseWidth = 1120, BaseHeight = 800;
+    private const double MinGpuScale = 0.6, MaxScale = 1.6;
 
     public MainWindow(MainViewModel viewModel, RgbView rgb)
     {
@@ -35,6 +38,7 @@ public partial class MainWindow : Window
         };
 
         FitToScreen();
+        Root.SizeChanged += (_, _) => UpdateUiScale();
 
         foreach (RadioButton corner in CornerPicker.Children)
             corner.IsChecked = (string)corner.Tag == viewModel.Overlay.Corner.ToString();
@@ -104,9 +108,28 @@ public partial class MainWindow : Window
     private void FitToScreen()
     {
         var area = SystemParameters.WorkArea;
-        var scale = Math.Min(1.0, Math.Min(area.Width * 0.9 / DesignWidth, area.Height * 0.9 / DesignHeight));
-        Width = DesignWidth * scale;
-        Height = DesignHeight * scale;
+        // The GPU page scrolls when it doesn't fit, so open as large as the screen comfortably allows.
+        Width = Math.Min(DesignWidth, area.Width * 0.9);
+        Height = Math.Min(DesignHeight, area.Height * 0.9);
+    }
+
+    /// <summary>
+    /// Scales the UI with the window so text stays readable on a large or maximized window.
+    /// GPU page: follows the window width (vertical scroll when taller than the window).
+    /// RGB page and tab switch: grow past their design size, never shrink below it.
+    /// </summary>
+    private void UpdateUiScale()
+    {
+        double w = Root.ActualWidth, h = Root.ActualHeight;
+        if (w <= 0 || h <= 0) return;
+
+        // Always leave room for the vertical scroll bar so showing it can't change the scale (no flicker).
+        var gpu = Math.Clamp((w - SystemParameters.VerticalScrollBarWidth) / GpuLayoutWidth, MinGpuScale, MaxScale);
+        GpuScale.ScaleX = GpuScale.ScaleY = gpu;
+
+        var ui = Math.Clamp(Math.Min(w / BaseWidth, h / BaseHeight), 1.0, MaxScale);
+        RgbScale.ScaleX = RgbScale.ScaleY = ui;
+        TabScale.ScaleX = TabScale.ScaleY = ui;
     }
 
     /// <summary>GPU / RGB switch at the top of the window.</summary>
