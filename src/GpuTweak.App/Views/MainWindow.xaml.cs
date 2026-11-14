@@ -35,9 +35,6 @@ public partial class MainWindow : Window
         };
 
         FitToScreen();
-        GpuPage.SizeChanged += (_, _) => FitLayout();
-        // Content height changes too (live panel on/off, wrapped text): fit again once layout has settled.
-        Layout.SizeChanged += (_, e) => { if (e.HeightChanged) Dispatcher.BeginInvoke(FitLayout, System.Windows.Threading.DispatcherPriority.Loaded); };
 
         foreach (RadioButton corner in CornerPicker.Children)
             corner.IsChecked = (string)corner.Tag == viewModel.Overlay.Corner.ToString();
@@ -72,29 +69,6 @@ public partial class MainWindow : Window
             _artifactHotKey?.Dispose();
             _overlay.Close();
         };
-    }
-
-    /// <summary>
-    /// The Viewbox scales by the tighter of width and height. When the window is wider than the layout's shape,
-    /// widen the layout (cards stretch) so it fills the window edge to edge; a wider layout wraps less text and
-    /// gets shorter, which also lets the Viewbox scale everything up.
-    /// </summary>
-    private void FitLayout()
-    {
-        double w = GpuPage.ActualWidth, h = GpuPage.ActualHeight;
-        if (w <= 0 || h <= 0) return;
-        var margin = Layout.Margin.Left + Layout.Margin.Right;
-        var width = Layout.Width;
-        for (var i = 0; i < 4; i++)
-        {
-            Layout.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
-            var desired = Layout.DesiredSize;
-            if (desired.Width <= 0 || desired.Height <= 0) return;
-            var scale = Math.Min(w / desired.Width, h / desired.Height);
-            var target = Math.Clamp(w / scale - margin, DesignWidth, DesignWidth * 1.8);
-            if (Math.Abs(target - width) < 2) break;
-            Layout.Width = width = target;
-        }
     }
 
     /// <summary>Started at Windows sign-in: run in the notification area without showing the window.</summary>

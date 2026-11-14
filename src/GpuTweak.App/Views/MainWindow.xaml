@@ -26,10 +26,9 @@
         </Border>
 
         <Grid x:Name="GpuPage" Grid.Row="1">
-            <!-- The whole layout is scaled to fit the window, so it never needs scrolling. Its width follows the
-                 window's shape (FitLayout in code), so a wide window fills edge to edge instead of leaving empty sides. -->
+            <!-- The whole layout is designed at a fixed size and scaled to fit the window, so it never needs scrolling. -->
             <Viewbox Stretch="Uniform" VerticalAlignment="Top">
-                <Grid x:Name="Layout" Width="1400" Margin="28,22,28,28">
+                <Grid Width="1400" Margin="28,22,28,28">
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto"/>
                         <RowDefinition Height="Auto"/>
