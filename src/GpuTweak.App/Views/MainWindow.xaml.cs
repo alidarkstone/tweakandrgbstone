@@ -21,7 +21,7 @@ public partial class MainWindow : Window
     private const double DesignWidth = 1400, DesignHeight = 1480, GpuLayoutWidth = 1456;
     // Window size the RGB page and the tab switch are designed for; they grow from here, never shrink.
     private const double BaseWidth = 1120, BaseHeight = 800;
-    private const double MinGpuScale = 0.6, MaxScale = 2.0;
+    private const double MinGpuScale = 0.6, MaxScale = 1.6;
 
     public MainWindow(MainViewModel viewModel, RgbView rgb)
     {
