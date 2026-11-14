@@ -11,7 +11,7 @@ namespace GpuTweak.App.Native;
 /// </summary>
 /// <remarks>
 /// The session sees every Present on the system (the desktop, a browser playing video, ...), so it only runs
-/// while the widget shows FPS (<see cref="Active"/>), and asks Windows to deliver only the Present events.
+/// while the widget shows FPS (<see cref="Active"/>).
 /// </remarks>
 internal sealed class PresentEventSource : IDisposable
 {
@@ -48,10 +48,10 @@ internal sealed class PresentEventSource : IDisposable
         {
             // A session left over from a crash has the same name and is replaced.
             session = new TraceEventSession("GpuTweak-FPS") { StopOnDispose = true };
-            session.EnableProvider(Dxgi, TraceEventLevel.Informational, ulong.MaxValue,
-                new TraceEventProviderOptions { EventIDsToEnable = new List<int> { DxgiPresentStart, DxgiPresentMpoStart } });
-            session.EnableProvider(D3D9, TraceEventLevel.Informational, ulong.MaxValue,
-                new TraceEventProviderOptions { EventIDsToEnable = new List<int> { D3D9PresentStart } });
+            // No event-ID filter here: with it (0.10.10) the in-game widget
+            // stopped showing FPS. The handler below already keeps only the Present events.
+            session.EnableProvider(Dxgi, TraceEventLevel.Informational, ulong.MaxValue);
+            session.EnableProvider(D3D9, TraceEventLevel.Informational, ulong.MaxValue);
             var source = session.Source;
             var tracker = _tracker;
             source.AllEvents += e =>
