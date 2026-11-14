@@ -108,6 +108,20 @@ public sealed class StabilityTracker
     }
 
     /// <summary>
+    /// The user says the problems so far were not the settings' fault (e.g. a driver bug) and wants to start clean: every
+    /// logged incident stops counting (it stays in the log, marked "not counted") and nothing is left to undo. The clean
+    /// gaming time is not touched.
+    /// </summary>
+    public void ResetIncidents()
+    {
+        lock (_gate)
+        {
+            _state = _state with { Incidents = _state.Incidents.Select(i => i with { Ignored = true }).ToList(), LastAdjustment = null };
+            Save();
+        }
+    }
+
+    /// <summary>
     /// Call whenever the card's settings change (apply, profile, reset). Going back to stock only pauses tracking,
     /// so a reboot without auto-apply does not throw away the clean time of the custom settings; switching to
     /// different custom settings starts the count again.

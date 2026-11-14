@@ -70,6 +70,35 @@ namespace RgbStone.Drivers
             }
         }
 
+        /// <summary>
+        /// The long HID++ endpoint and slot of a device id made by this driver ("hid:046d:c547:...:1"), or null when the id is
+        /// not a Logitech one or its receiver is not plugged in.
+        /// </summary>
+        internal static (HidDeviceInfo longEp, byte index)? Locate(string id, IEnumerable<HidDeviceInfo> hid)
+        {
+            int cut = id.LastIndexOf(':');
+            if (!id.StartsWith("hid:046d:") || cut < 0 || !byte.TryParse(id.Substring(cut + 1), out byte index)) return null;
+            string baseId = id.Substring(0, cut);
+            var longEp = hid.FirstOrDefault(d => d.VendorId == 0x046D && d.UsagePage == 0xFF00 && d.Usage == 0x0002 && HidSelect.Id(d) == baseId);
+            return longEp == null ? ((HidDeviceInfo, byte)?)null : (longEp, index);
+        }
+
+        /// <summary>
+        /// One short HID++ question to a receiver slot: true once the device behind it answers. A wireless keyboard that has
+        /// not been touched since boot sleeps and the receiver answers "not connected" for it, sometimes for minutes.
+        /// </summary>
+        public static bool Answers(string id, IEnumerable<HidDeviceInfo> hid)
+        {
+            var at = Locate(id, hid);
+            if (at == null) return false;
+            try
+            {
+                using (var link = new HidppLink(HidDevice.Open(at.Value.longEp), at.Value.index))
+                    return link.FeatureIndex(0x8081, 250) >= 0;
+            }
+            catch { return false; }
+        }
+
         /// <summary>Asks every slot (1-6 on a receiver, 0xFF when wired) what it is and which lighting features it has.</summary>
         static List<RgbDevice> Probe(HidDeviceInfo shortEp, HidDeviceInfo longEp, bool receiver, ushort pid)
         {
@@ -124,6 +153,7 @@ namespace RgbStone.Drivers
             bool _singleValueOk;
 
             public override string[] ConflictingProcesses => new[] { "lghub_agent", "lghub" };
+            public override bool ConflictNeedsWindow => true; // lghub_agent restarts in the background; only the G HUB window is the user
 
             LogitechKeyboard(HidDevice shortEp, HidDevice longEp, byte index, Model m)
             {
@@ -205,7 +235,7 @@ namespace RgbStone.Drivers
             // right after it reconnects. rgbstone only sends changed keys, so with a static color it would never repaint.
             // On a reconnect notice the keyboard is taken over again (twice, to land after anything else that reacts to it),
             // and every RefreshEvery the whole frame is sent again in case the notice was missed.
-            static readonly TimeSpan RefreshEvery = TimeSpan.FromSeconds(20);
+            static readonly TimeSpan RefreshEvery = TimeSpan.FromSeconds(5);
             DateTime _nextRefresh = DateTime.MinValue;
             readonly Queue<DateTime> _retake = new Queue<DateTime>();
 

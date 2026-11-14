@@ -83,11 +83,15 @@ namespace RgbStone.UI
 
             _refresh = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1) };
             _refresh.Tick += (s, e) => RefreshStatus();
-            _refresh.Start();
 
             _animation = new DispatcherTimer(DispatcherPriority.Render) { Interval = TimeSpan.FromMilliseconds(33) };
             _animation.Tick += (s, e) => AnimatePreviews();
-            _animation.Start();
+            // The app mostly sits in the tray: run the page timers only while the RGB tab is on screen.
+            IsVisibleChanged += (s, e) =>
+            {
+                if (IsVisible) { RefreshStatus(); _refresh.Start(); _animation.Start(); }
+                else { _refresh.Stop(); _animation.Stop(); }
+            };
 
             _engine.DevicesChanged += () => Dispatcher.BeginInvoke((Action)(() => { BuildNav(); _scanning = false; RescanButton.IsEnabled = true; RescanText.Text = "Cihazları yeniden tara"; }));
             // hot-plug messages arrive at the main window; it exists (hidden) even when started in the tray

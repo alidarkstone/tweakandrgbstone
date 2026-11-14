@@ -46,6 +46,42 @@ public sealed class OverlayViewModel : ObservableObject
 
     public OverlaySettings Settings => _settings;
     public bool Enabled { get => _settings.Enabled; set => Change(_settings with { Enabled = value }); }
+    public bool AutoShowInGames { get => _settings.AutoShowInGames; set => Change(_settings with { AutoShowInGames = value }); }
+
+    private bool _inGame;
+    /// <summary>True while a game session is detected; set from the main view model with every sample.</summary>
+    public bool InGame
+    {
+        get => _inGame;
+        set
+        {
+            if (!Set(ref _inGame, value)) return;
+            if (!value) _hiddenThisGame = false;
+            OnPropertyChanged(nameof(IsShown));
+        }
+    }
+
+    /// <summary>Set when the user hides the widget with the shortcut during a game; it then stays hidden until that game ends.</summary>
+    private bool _hiddenThisGame;
+
+    /// <summary>The widget is on screen when switched on, or during a game when "open in games" is on.</summary>
+    public bool IsShown => Enabled || (AutoShowInGames && InGame && !_hiddenThisGame);
+
+    /// <summary>The shortcut: hides the widget if it is on screen (for the rest of this game if it opened by itself), otherwise shows it.</summary>
+    public void Toggle()
+    {
+        if (IsShown)
+        {
+            _hiddenThisGame = InGame;
+            if (Enabled) Enabled = false;
+            else OnPropertyChanged(nameof(IsShown));
+        }
+        else
+        {
+            _hiddenThisGame = false;
+            Enabled = true;
+        }
+    }
     public OverlayCorner Corner { get => _settings.Corner; set => Change(_settings with { Corner = value }); }
     public double Opacity { get => _settings.Opacity; set => Change(_settings with { Opacity = Math.Clamp(value, 0.2, 1) }); }
     public double Scale { get => _settings.Scale; set => Change(_settings with { Scale = Math.Clamp(value, 0.75, 1.5) }); }

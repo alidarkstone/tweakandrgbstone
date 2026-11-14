@@ -51,6 +51,11 @@ namespace RgbStone.Drivers
         const byte Addr = 0x49, RegControl = 0xE0, RegMode = 0x60, RegR = 0x6C, RegG = 0x6D, RegB = 0x6E, RegBrightness = 0x6F;
         readonly NvApi.Gpu _gpu;
         Rgb? _last;
+        int _failures;
+        DateTime _retryAt = DateTime.MinValue;
+        /// <summary>After this many failed writes in a row the LED is left alone for <see cref="FailurePause"/>.</summary>
+        const int MaxFailures = 3;
+        static readonly TimeSpan FailurePause = TimeSpan.FromMinutes(1);
 
         public PnyGpu(NvApi.Gpu gpu, string name)
         {
@@ -59,7 +64,9 @@ namespace RgbStone.Drivers
             Name = name;
             Vendor = "NVIDIA";
             Kind = DeviceKind.Gpu;
-            MaxFps = 30;
+            // Every write is an I2C transaction through the display driver. At 30 fps a rainbow effect made ~90 of them a
+            // second, all the time, also while the card decodes video; a single logo LED does not need more than a few.
+            MaxFps = 4;
             Zones.Add(new RgbZone("Logo", 1));
         }
 
@@ -69,18 +76,37 @@ namespace RgbStone.Drivers
                    && NvApi.WriteByte(_gpu, Addr, RegMode, 0x01)
                    && NvApi.WriteByte(_gpu, Addr, RegBrightness, 0x64);
             _last = null;
+            _failures = ok ? 0 : _failures + 1;
             Status = ok ? "Doğrudan kontrol" : "I2C yazılamadı";
         }
 
         public override void Apply()
         {
+            var now = DateTime.UtcNow;
+            if (now < _retryAt) return;
             var c = Zones[0].Colors[0];
             if (_last == c) return;
-            bool ok = NvApi.WriteByte(_gpu, Addr, RegR, c.R)
-                   && NvApi.WriteByte(_gpu, Addr, RegG, c.G)
-                   && NvApi.WriteByte(_gpu, Addr, RegB, c.B);
-            if (ok) _last = c;
-            Status = ok ? "Doğrudan kontrol" : "I2C yazılamadı";
+            // Only the channels that changed are sent.
+            var last = _last;
+            bool ok = (last?.R == c.R || NvApi.WriteByte(_gpu, Addr, RegR, c.R))
+                   && (last?.G == c.G || NvApi.WriteByte(_gpu, Addr, RegG, c.G))
+                   && (last?.B == c.B || NvApi.WriteByte(_gpu, Addr, RegB, c.B));
+            if (ok)
+            {
+                _last = c;
+                _failures = 0;
+                Status = "Doğrudan kontrol";
+                return;
+            }
+            // A failing bus is not hammered every frame: after a few failures in a row, wait a minute.
+            _last = null;
+            if (++_failures >= MaxFailures)
+            {
+                _failures = 0;
+                _retryAt = now + FailurePause;
+                Status = "I2C yazılamadı, 1 dk bekleniyor";
+            }
+            else Status = "I2C yazılamadı";
         }
     }
 }

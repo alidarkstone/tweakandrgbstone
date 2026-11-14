@@ -36,11 +36,11 @@ public partial class OverlayWindow : Window
 
     private void OnSettingsChanged(object? sender, PropertyChangedEventArgs e)
     {
-        if (e.PropertyName is "" or nameof(OverlayViewModel.Enabled)) UpdateVisibility();
+        if (e.PropertyName is "" or nameof(OverlayViewModel.Enabled) or nameof(OverlayViewModel.IsShown)) UpdateVisibility();
         if (e.PropertyName is "" or nameof(OverlayViewModel.Corner)) Reposition();
     }
 
-    private void UpdateVisibility() => Visibility = _viewModel.Enabled ? Visibility.Visible : Visibility.Hidden;
+    private void UpdateVisibility() => Visibility = _viewModel.IsShown ? Visibility.Visible : Visibility.Hidden;
 
     /// <summary>Uses full screen bounds rather than the work area, because games cover the taskbar.</summary>
     private void Reposition()

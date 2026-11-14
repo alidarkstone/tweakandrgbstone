@@ -36,6 +36,8 @@ namespace RgbStone.Core
         [DataMember] public bool VendorTakeover;
         /// <summary>Home-network web dashboard; off by default.</summary>
         [DataMember] public bool WebEnabled;
+        /// <summary>True while rgbstone's firewall rule for the dashboard exists, so it is only removed when it was added.</summary>
+        [DataMember] public bool FirewallRuleAdded;
         [DataMember] public string WebPin;
         /// <summary>Services rgbstone stopped and must start again; persisted so a crash cannot leave them off.</summary>
         [DataMember] public List<string> StoppedServices = new List<string>();

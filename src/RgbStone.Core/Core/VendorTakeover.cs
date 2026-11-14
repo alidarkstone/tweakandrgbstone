@@ -51,7 +51,7 @@ namespace RgbStone.Core
         /// True when a takeover target came back while rgbstone runs. MSI Center relaunches LEDKeeper2 (and can restart the
         /// lighting services) on its own, so a reappearance is not the user opening the vendor app.
         /// </summary>
-        public static bool TargetsRunning()
+        public static bool TargetsRunning(Func<string, bool> processRunning = null)
         {
             foreach (var name in Services)
             {
@@ -60,7 +60,7 @@ namespace RgbStone.Core
             }
             foreach (var name in Processes)
             {
-                try { if (Process.GetProcessesByName(name).Length > 0) return true; } catch { }
+                try { if (processRunning != null ? processRunning(name) : Process.GetProcessesByName(name).Length > 0) return true; } catch { }
             }
             return false;
         }

@@ -230,4 +230,22 @@ public sealed class StabilityTests : IDisposable
         var undo = Tracker().UndoLastAdjustment()!;
         Assert.Equal(Uv, undo.Settings);
     }
+
+    [Fact]
+    public void ResetStopsCountingEveryIncident()
+    {
+        var tracker = Tracker();
+        tracker.SettingsChanged(Uv);
+        _now = _now.AddMinutes(5);
+        _source.Events.Add(new(_now.AddMinutes(-2), IncidentKind.DriverReset, "nvlddmkm"));
+        _source.Events.Add(new(_now.AddMinutes(-1), IncidentKind.DriverReset, "nvlddmkm"));
+        tracker.Check();
+        Assert.NotNull(tracker.Undoable);
+
+        tracker.ResetIncidents();
+        var state = Tracker().State;
+        Assert.Equal(2, state.Incidents.Count);
+        Assert.All(state.Incidents, i => Assert.True(i.Ignored));
+        Assert.Null(state.LastAdjustment);
+    }
 }

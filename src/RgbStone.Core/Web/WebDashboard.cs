@@ -83,7 +83,7 @@ namespace RgbStone.Web
                 _listener = null;
                 return false;
             }
-            AddFirewallRule();
+            AddFirewallRule(_settings);
             _thread = new Thread(Loop) { IsBackground = true, Name = "rgb web" };
             _thread.Start();
             Log.Info("Web panosu açık: " + string.Join(", ", LocalAddresses()));
@@ -96,24 +96,35 @@ namespace RgbStone.Web
             try { _listener.Stop(); _listener.Close(); } catch { }
             _listener = null;
             lock (_tokens) _tokens.Clear();
-            RemoveFirewallRule();
+            RemoveFirewallRule(_settings);
             Log.Info("Web panosu kapatıldı.");
         }
 
         public void Dispose() => Stop();
 
-        /// <summary>Removes a rule left behind if rgbstone was killed while the dashboard was on.</summary>
-        public static void CleanupIfDisabled(AppSettings s) { if (!s.WebEnabled) RemoveFirewallRule(); }
+        /// <summary>
+        /// Removes a rule left behind if rgbstone was killed while the dashboard was on. netsh only runs when the rule was
+        /// added: a hidden elevated netsh on every start-up is the kind of thing behavioral antivirus scores as an attack.
+        /// </summary>
+        public static void CleanupIfDisabled(AppSettings s) { if (!s.WebEnabled && s.FirewallRuleAdded) RemoveFirewallRule(s); }
 
         // ---------- firewall: private (home) profile only, removed when the dashboard is turned off ----------
 
-        static void AddFirewallRule()
+        static void AddFirewallRule(AppSettings s)
         {
-            RemoveFirewallRule();
+            if (s.FirewallRuleAdded) return;
             Netsh($"advfirewall firewall add rule name=\"{FirewallRule}\" dir=in action=allow protocol=TCP localport={Port} profile=private");
+            s.FirewallRuleAdded = true;
+            s.Save();
         }
 
-        static void RemoveFirewallRule() => Netsh($"advfirewall firewall delete rule name=\"{FirewallRule}\"");
+        static void RemoveFirewallRule(AppSettings s)
+        {
+            if (!s.FirewallRuleAdded) return;
+            Netsh($"advfirewall firewall delete rule name=\"{FirewallRule}\"");
+            s.FirewallRuleAdded = false;
+            s.Save();
+        }
 
         static void Netsh(string args)
         {
